@@ -168,7 +168,7 @@ void		CAAUParameter::Init (AudioUnit au, AudioUnitParameterID param, AudioUnitSc
 			str = "msecs";
 			break;
 		case kAudioUnitParameterUnit_Ratio:
-			str = "ratio";
+			str = "Ratio";
 			break;
 		case kAudioUnitParameterUnit_Indexed:
 			{

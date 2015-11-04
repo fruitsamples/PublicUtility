@@ -134,7 +134,6 @@ void	CAGuard::Wait()
 	OSStatus theError = WaitForMultipleObjects(2, theHandles, true, INFINITE);
 	ThrowIfError(theError, CAException(GetLastError()), "CAGuard::Wait: Could not wait for the signal");
 	mOwner = GetCurrentThreadId();
-	ResetEvent(mEvent);
 
 	#if	Log_WaitOwnership
 		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAGuard::Wait: thread %lu waited on %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);

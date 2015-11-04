@@ -43,15 +43,13 @@
 #ifndef __TStack_h__
 #define __TStack_h__
 
-#if __LP64__
+#if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
 	#include <libkern/OSAtomic.h>
-#elif !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
-	#include <CoreServices/CoreServices.h>
 #else
 	#include <DriverSynchronization.h>
 #endif
 
-//  linked list FIFO stack, elements are pushed and popped atomically
+//  linked list LIFO or FIFO (pop_all_reversed) stack, elements are pushed and popped atomically
 //  class T must implement set_next() and get_next()
 template <class T>
 class TAtomicStack {
@@ -85,13 +83,46 @@ public:
 		} while (!compare_and_swap(head, item, &mHead));
 	}
 	
-	T *		pop_atomic()
+	void	push_multiple_atomic(T *item)
+		// pushes entire linked list headed by item
+	{
+		T *head, *p = item, *tail;
+		// find the last one -- when done, it will be linked to head
+		do {
+			tail = p;
+			p = p->get_next();
+		} while (p);
+		do {
+			head = mHead;
+			tail->set_next(head);
+		} while (!compare_and_swap(head, item, &mHead));
+	}
+	
+	T *		pop_atomic_single_reader()
+		// this may only be used when only one thread may potentially pop from the stack.
+		// if multiple threads may pop, this suffers from the ABA problem.
+		// <rdar://problem/4606346> TAtomicStack suffers from the ABA problem
 	{
 		T *result;
 		do {
 			if ((result = mHead) == NULL)
 				break;
 		} while (!compare_and_swap(result, result->get_next(), &mHead));
+		return result;
+	}
+	
+	T *		pop_atomic()
+		// This is inefficient for large linked lists.
+		// prefer pop_all() to a series of calls to pop_atomic.
+		// push_multiple_atomic has to traverse the entire list.
+	{
+		T *result = pop_all();
+		if (result) {
+			T *next = result->get_next();
+			if (next)
+				// push all the remaining items back onto the stack
+				push_multiple_atomic(next);
+		}
 		return result;
 	}
 	
@@ -119,10 +150,16 @@ public:
 	
 	bool	compare_and_swap(T *oldvalue, T *newvalue, T **pvalue)
 	{
-#if __LP64__
-		return ::OSAtomicCompareAndSwap64Barrier(int64_t(oldvalue), int64_t(newvalue), (int64_t *)pvalue);
+#if TARGET_OS_MAC
+	#if __LP64__
+			return ::OSAtomicCompareAndSwap64Barrier(int64_t(oldvalue), int64_t(newvalue), (int64_t *)pvalue);
+	#elif MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_4
+			return ::OSAtomicCompareAndSwap32Barrier(int32_t(oldvalue), int32_t(newvalue), (int32_t *)pvalue);
+	#else
+			return ::CompareAndSwap(UInt32(oldvalue), UInt32(newvalue), (UInt32 *)pvalue);
+	#endif
 #else
-		return ::CompareAndSwap(UInt32(oldvalue), UInt32(newvalue), (UInt32 *)pvalue);
+			return ::CompareAndSwap(UInt32(oldvalue), UInt32(newvalue), (UInt32 *)pvalue);
 #endif
 	}
 	

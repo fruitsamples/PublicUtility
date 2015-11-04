@@ -227,7 +227,7 @@ void		CAFileHandling::Scan (const FSRef &inParentDir, CFTreeRef inParentTree)
 	FSIterator iter;
 	LSItemInfoRecord info;
 	bool fileIsBundle;
-	
+
 	if (FSOpenIterator (&inParentDir, kFSIterateFlat, &iter))
 		return;
 

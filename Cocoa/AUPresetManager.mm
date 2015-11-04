@@ -36,141 +36,10 @@
 			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 /*=============================================================================
- *  AUPresetManager.m
+ *  AUPresetManager.mm
  *  PlayPen
  *-----------------------------------------------------------------------------
  *
- *
- * Revision 1.8  2005/03/09 22:42:22  dwyatt
- * don't leak presetToSet.presetName in itemWasActivated
- *
- * Revision 1.7  2005/03/09 01:38:13  bills
- * fix setting preset calls
- *
- * Revision 1.6  2005/03/08 02:19:27  dwyatt
- * don't leak CFPropertyListRefs
- *
- * Revision 1.5  2004/11/16 17:35:35  luke
- * clean up code
- *
- * Revision 1.4  2004/11/13 17:46:17  luke
- * removed NSAsserts & better handling errors
- *
- * Revision 1.3  2004/11/10 03:34:24  bills
- * delete on NULL is ok
- *
- * Revision 1.2  2004/11/10 03:32:52  bills
- * fix dealloc method
- *
- * Revision 1.1  2004/07/29 00:21:15  luke
- * factored out from PlayPen
- *
- * Revision 1.12  2004/07/29 00:08:51  luke
- * tweaks
- *
- * Revision 1.11  2004/07/28 23:57:20  luke
- * pass 3: final
- *
- * Revision 1.9  2004/07/28 20:49:24  luke
- * align with changes to CAFileBrowser
- *
- * Revision 1.8  2004/07/07 00:24:16  luke
- * [3482090] make AUInspector localizable
- *
- * Revision 1.7  2004/06/24 23:20:22  mhopkins
- * added method to return name and data key strings
- *
- * Revision 1.6  2004/05/27 22:56:08  luke
- * don't allow Factory presets to be renamed
- *
- * Revision 1.5  2004/05/26 19:42:47  luke
- * don't show factory preset option if unit doesn't have any factory presets
- *
- * Revision 1.4  2004/05/26 17:13:01  luke
- * [3656248] only search Network for presets when preferences say to do so
- *
- * Revision 1.3  2004/05/25 22:23:36  luke
- * sync. with changes to superclass & deallocate correctly
- *
- * Revision 1.2  2004/04/29 23:08:39  luke
- * fix sync w/ interface changes to AUInspector
- *
- * Revision 1.1  2004/04/17 20:05:20  luke
- * source reorg.
- *
- * Revision 1.22  2003/12/18 19:48:29  luke
- * push directory-creation code into CAFileBrowser superclass
- *
- * Revision 1.21  2003/12/02 01:17:19  luke
- * CAFileHandling factored
- *
- * Revision 1.20  2003/11/20 00:58:31  crogers
- * check factoryPresets for NULL
- *
- * Revision 1.19  2003/11/12 23:58:02  luke
- * tweak includes
- *
- * Revision 1.18  2003/11/06 19:25:04  luke
- * change title: 'Presets' -> 'AudioUnit Presets
- *
- * Revision 1.17  2003/10/30 19:08:08  luke
- * fix for NetInfo user dirs
- *
- * Revision 1.16  2003/10/22 20:21:39  luke
- * don't notify on presetChange: use propListeners
- *
- * Revision 1.15  2003/10/21 23:28:26  luke
- * added features that future subclasses may need
- *
- * Revision 1.14  2003/10/21 22:03:57  luke
- * change some behavior per discussions with Bill
- *
- * Revision 1.13  2003/10/21 18:53:52  luke
- * call self, not super
- *
- * Revision 1.12  2003/10/17 22:39:14  luke
- * implement preset saving
- *
- * Revision 1.11  2003/10/15 16:56:43  luke
- * tighten up code.
- *
- * Revision 1.10  2003/10/15 00:46:04  luke
- * tighten up code
- *
- * Revision 1.9  2003/10/15 00:12:50  luke
- * factor general support into CAFileBrowser class
- *
- * Revision 1.8  2003/10/14 19:18:32  luke
- * sync. with changes to CAFileHandling
- *
- * Revision 1.7  2003/10/14 18:18:19  luke
- * sync. with requested changes to CAFileHandling
- *
- * Revision 1.6  2003/10/14 17:25:35  luke
- * fix warnings
- *
- * Revision 1.5  2003/10/14 17:21:59  luke
- * now using CAFileHandling class
- *
- * Revision 1.4  2003/09/24 21:07:28  luke
- * alert AUParameterListeners when we load a preset
- *
- * Revision 1.3  2003/09/24 06:39:37  luke
- * finish implementation of preset browser
- *
- * Revision 1.2  2003/09/23 20:46:44  luke
- * updates
- *
- * Revision 1.1  2003/09/23 17:22:01  luke
- * AUPresetManager.m -> AUPresetManager.mm
- *
- * Revision 1.1  2003/09/23 00:58:22  luke
- * new file
- *
- *
- *-----------------------------------------------------------------------------
- *  Created by Luke Bellandi on Mon Sep 22 2003.
- *  Copyright (c) 2003 Apple Computer Inc. All rights reserved.
  *=============================================================================*/
 
 #import <AudioUnit/AudioUnit.h>
@@ -272,7 +141,7 @@
                                                     0,
                                                     &presetToSet,
                                                     sizeof(AUPreset)	);
-    if (result != noErr) 
+    if (result != noErr)
 		return NO;
     
     // now get classInfo & write to file
@@ -322,8 +191,17 @@
 														0,
 														&presetToSet,
 														sizeof(AUPreset)	);
-		if (result != noErr)
-			return NO;
+		if (result != noErr) {
+			// try old 'currentPreset' property if presentPreset doesn't work
+			result = AudioUnitSetProperty (	mAudioUnit,
+											kAudioUnitProperty_CurrentPreset,
+											kAudioUnitScope_Global,
+											0,
+											&presetToSet,
+											sizeof(AUPreset)	);
+			if (result != noErr)
+				return NO;
+		}
     }
 	else
 	{
@@ -471,6 +349,5 @@
 	// ELSE SUPERCLASS HANDLING
     return [super outlineView:outlineView objectValueForTableColumn:tableColumn byItem:item];
 }
-
 
 @end

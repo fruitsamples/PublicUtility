@@ -64,7 +64,7 @@ AUOutputBL::AUOutputBL (const CAStreamBasicDescription &inDesc, UInt32 inDefault
 		  mFrames(inDefaultNumFrames)
 {
 	mNumberBuffers = mFormat.IsInterleaved() ? 1 : mFormat.NumberChannels();
-	mBufferList = reinterpret_cast<AudioBufferList*>(new Byte[sizeof(UInt32) + (mNumberBuffers * sizeof(AudioBuffer))]);
+	mBufferList = reinterpret_cast<AudioBufferList*>(new Byte[offsetof(AudioBufferList, mBuffers) + (mNumberBuffers * sizeof(AudioBuffer))]);
 }
 
 AUOutputBL::~AUOutputBL()
@@ -151,10 +151,10 @@ void			AUOutputBL::Print()
 {
 	printf ("AUOutputBL::Print\n");
 	mFormat.Print();
-	printf ("Num Buffers:%ld, mFrames:%ld, allocatedMemory:%c\n", mBufferList->mNumberBuffers, mFrames, (mBufferMemory != NULL ? 'T' : 'F'));
+	printf ("Num Buffers:%d, mFrames:%d, allocatedMemory:%c\n", (int)mBufferList->mNumberBuffers, (int)mFrames, (mBufferMemory != NULL ? 'T' : 'F'));
 	AudioBuffer *buf = &mBufferList->mBuffers[0];
 	for (UInt32 i = 0; i < mBufferList->mNumberBuffers; ++i, ++buf)
-		printf ("\tBuffer:%ld, Size:%ld, Chans:%ld, Buffer:%X\n", i, buf->mDataByteSize, buf->mNumberChannels, int(buf->mData));
+		printf ("\tBuffer:%d, Size:%d, Chans:%d, Buffer:%p\n", (int)i, (int)buf->mDataByteSize, (int)buf->mNumberChannels, buf->mData);
 }
 #endif
 

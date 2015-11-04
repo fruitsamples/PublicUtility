@@ -38,32 +38,6 @@
 /*==================================================================================================
 	CAMutex.cpp
 	
-	
-	Revision 1.7  2004/10/28 01:11:58  dwyatt
-	[a radar for each of our projects] CAMutex.cpp (not .h) requires errno.h
-	
-	Revision 1.6  2004/09/29 00:59:10  jcm10
-	use the right test in Lock()
-	
-	Revision 1.5  2004/09/04 21:20:46  dwyatt
-	add Log_LongLatencies
-	
-	Revision 1.4  2004/09/02 00:01:49  dwyatt
-	optimize Lock() and Try() to call pthread_self once instead of twice
-	
-	Revision 1.3  2004/08/26 08:13:33  jcm10
-	finish bring up on Windows
-	
-	Revision 1.2  2004/03/13 02:27:38  jcm10
-	enable the new Try code
-	
-	Revision 1.1  2003/12/17 20:56:59  dwyatt
-	new base class for CAGuard
-	
-	created Wed Dec 17 2003, Doug Wyatt
-	Copyright (c) 2003 Apple Computer, Inc.  All Rights Reserved
-
-	$NoKeywords: $
 ==================================================================================================*/
 
 //==================================================================================================

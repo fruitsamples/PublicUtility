@@ -143,8 +143,8 @@ public:
 						bool needToInsert = true;
 						for (pnode = mActiveList.phead(); *pnode != NULL; pnode = &node->mNext) {
 							node = *pnode;
-							if (node->mObject == event->mObject) {
-								//printf("already active!!!\n");
+						if (node->mObject == event->mObject) {
+							//printf("already active!!!\n");
 								FreeNode(event);
 								needToInsert = false;
 								break;

@@ -39,6 +39,10 @@
 	CAAudioFileFormats.cpp
 	
 =============================================================================*/
+/*=============================================================================
+	CAAudioFileFormats.cpp
+	
+=============================================================================*/
 
 #include "CAAudioFileFormats.h"
 #include <algorithm>
@@ -390,4 +394,5 @@ void	CAAudioFileFormats::DataFormatInfo::DebugPrint()
 	}
 }
 #endif
+
 

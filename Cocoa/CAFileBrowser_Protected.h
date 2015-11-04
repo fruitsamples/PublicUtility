@@ -36,11 +36,11 @@
 			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 /*=============================================================================
- *  CAFileBrowser_Protected.h
- *  PlayPen
- *-----------------------------------------------------------------------------
- *
- *=============================================================================*/
+*  CAFileBrowser_Protected.h
+*  PlayPen
+*-----------------------------------------------------------------------------
+*
+*=============================================================================*/
 
 @interface CAFileBrowser(Protected)
 #pragma mark ____ PUBLIC FUNCTIONS ____
@@ -55,12 +55,12 @@
 	// created for display.  CAFileBrowser just keeps a reference to that object,
 	// so it's the subclass' responsibility to keep that object alive for the
 	// duration of the lifespan of this, its superclass.
-	
+
 - (void)unsetCAFileHandlingObject;
 	// called by subclasses before deleting the CAFileHandling object previously set
 	// on them.  It is essential that this call be made before subsequent calls to
 	// setCAFileHandlingObject are made.
-	
+
 - (CAFileHandling *)CAFileHandlingObject;
 	// get current CAFileHandling object;
 
@@ -74,11 +74,11 @@
 	// double-clicks on an item in the outline view.  Because of the way CAFileBrowser
 	// handles events, clients should NOT override setTarget:, setAction:,
 	// setDoubleAction:, or other event handling methods.
-	
+
 - (NSString *)fileExtension;
 	// subclasses should override to return the name of the preset file extension
 	// (without the '.')
-	
+
 - (NSString *)nameKeyString;
 	// subclasses should override to return the name of the key (usually "name") whose
 	// value is the name of the preset.

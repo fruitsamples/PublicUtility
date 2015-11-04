@@ -36,11 +36,11 @@
 			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 /*=============================================================================
- *  CAFileBrowser.h
- *  PlayPen
- *-----------------------------------------------------------------------------
- *
- *=============================================================================*/
+*  CAFileBrowser.h
+*  PlayPen
+*-----------------------------------------------------------------------------
+*
+*=============================================================================*/
 
 #import <Cocoa/Cocoa.h>
 
@@ -51,7 +51,7 @@ extern NSString *CARootNetworkDirectory;
 class CAFileHandling;
 
 @interface CAFileBrowser : NSOutlineView {
-@protected
+	@protected
     NSTextFieldCell *		mCell;
 	NSString *				mCachedRenameValue;
 	
@@ -89,15 +89,15 @@ class CAFileHandling;
 - (CFPropertyListRef)readPropertyListForItem:(id)item;
 	// client is responsible for releasing returned CFPropertyListRef
 	// returns NULL if property list could not be retrieved
-	
+
 - (BOOL)presetName:(NSString *)inPresetName existsAsChildOf:(id)item;
 	// use before calling savePresetWithName:asChildOf: to detect a potential overwrite
-	
+
 - (BOOL)savePresetWithName:(NSString *)inPresetName asChildOf:(id)item;
     // subclasses should implement this method to save appropriate
 	// data at the location specified by the client.
 	// returns: YES if operation was successful
-	
+
 - (NSArray *)expandedItems;
 	// returns a storable array of the expanded items in the CAFileBrowser.
 	// This can be saved to disk or cached to restore the items-expanded state
@@ -106,7 +106,7 @@ class CAFileHandling;
 - (void)setExpandedItems:(NSArray *)inOpenedItems;
 	// restores the CAFileBrowser's items-expanded state from an array retrieved
 	// from an earlier call to expandedItems.
-	
+
 - (BOOL)createDirectory:(NSString *)inName asChildOfItem:(id)parent;
 	// creates an empty directory as a child of the specified item
 	// (specified item must be a directory.)
@@ -118,5 +118,5 @@ class CAFileHandling;
 	// Subclasses should delete their CAFileHandlingObject here,
 	// create a new one, and reset it using the protected
 	// setCAFileHandlingObject method.
-	
+
 @end
