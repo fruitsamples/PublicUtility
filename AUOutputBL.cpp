@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -55,21 +55,13 @@ struct AudioBuffer
 };
 */
 
-AUOutputBL::AUOutputBL ()
-		: mBufferMemory(NULL),
-		  mBufferList (NULL),
-		  mNumberBuffers (0),
-		  mBufferSize (0),
-		  mFrames(0)
-{}
-
-AUOutputBL::AUOutputBL (const CAStreamBasicDescription &inDesc) 
+AUOutputBL::AUOutputBL (const CAStreamBasicDescription &inDesc, UInt32 inDefaultNumFrames) 
 		: mFormat (inDesc),
 		  mBufferMemory(NULL),
 		  mBufferList (NULL),
 		  mNumberBuffers (0), // keep this here, so can ensure integrity of ABL
 		  mBufferSize (0),
-		  mFrames(0)
+		  mFrames(inDefaultNumFrames)
 {
 	mNumberBuffers = mFormat.IsInterleaved() ? 1 : mFormat.NumberChannels();
 	mBufferList = reinterpret_cast<AudioBufferList*>(new Byte[sizeof(UInt32) + (mNumberBuffers * sizeof(AudioBuffer))]);
@@ -84,17 +76,17 @@ AUOutputBL::~AUOutputBL()
 		delete [] mBufferList;
 }
 
-void 	AUOutputBL::Prepare (UInt32 inNumFrames) 
+void 	AUOutputBL::Prepare (UInt32 inNumFrames, bool inWantNullBufferIfAllocated) 
 {
 	UInt32 channelsPerBuffer = mFormat.IsInterleaved() ? mFormat.NumberChannels() : 1;
 	
-	if (mBufferMemory == NULL || inNumFrames == 0)
+	if (mBufferMemory == NULL || inWantNullBufferIfAllocated)
 	{
 		mBufferList->mNumberBuffers = mNumberBuffers;
 		AudioBuffer *buf = &mBufferList->mBuffers[0];
 		for (UInt32 i = 0; i < mNumberBuffers; ++i, ++buf) {
 			buf->mNumberChannels = channelsPerBuffer;
-			buf->mDataByteSize = 0;
+			buf->mDataByteSize = mFormat.FramesToBytes (inNumFrames);
 			buf->mData = NULL;
 		}
 	}
@@ -153,3 +145,16 @@ void	AUOutputBL::Allocate (UInt32 inNumFrames)
 		mFrames = 0;
 	}
 }
+
+#if DEBUG
+void			AUOutputBL::Print()
+{
+	printf ("AUOutputBL::Print\n");
+	mFormat.Print();
+	printf ("Num Buffers:%ld, mFrames:%ld, allocatedMemory:%c\n", mBufferList->mNumberBuffers, mFrames, (mBufferMemory != NULL ? 'T' : 'F'));
+	AudioBuffer *buf = &mBufferList->mBuffers[0];
+	for (UInt32 i = 0; i < mBufferList->mNumberBuffers; ++i, ++buf)
+		printf ("\tBuffer:%ld, Size:%ld, Chans:%ld, Buffer:%X\n", i, buf->mDataByteSize, buf->mNumberChannels, int(buf->mData));
+}
+#endif
+

@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -63,11 +63,11 @@ class AUOutputBL {
 public:
 											
 											// you CANNOT use one of these - it will crash!
-										AUOutputBL ();
+//										AUOutputBL ();
 										
 											// this is the constructor that you use
 											// it can't be reset once you've constructed it
-										AUOutputBL (const CAStreamBasicDescription &inDesc);
+										AUOutputBL (const CAStreamBasicDescription &inDesc, UInt32 inDefaultNumFrames = 512);
 										~AUOutputBL();
 
 	void 								Prepare ()
@@ -76,8 +76,9 @@ public:
 										}
 									
 								// this version can throw if this is an allocted ABL and inNumFrames is > AllocatedFrames()
-								// you can set inNumFrames == 0 if you want an empty buffer list
-	void 								Prepare (UInt32 inNumFrames);
+								// you can set the bool to true if you want a NULL buffer list even if allocated
+								// inNumFrames must be a valid number (will throw if inNumFrames is 0)
+	void 								Prepare (UInt32 inNumFrames, bool inWantNullBufferIfAllocated = false);
 	
 	AudioBufferList*					ABL() { return mBufferList; }
 								
@@ -92,6 +93,10 @@ public:
 	
 	const CAStreamBasicDescription&		GetFormat() const { return mFormat; }
 
+#if DEBUG
+	void								Print();
+#endif
+	
 private:
 	UInt32						AllocatedBytes () const { return (mBufferSize * mNumberBuffers); }
 

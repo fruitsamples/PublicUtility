@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -49,7 +49,8 @@ class CAAUPresetFile : public CAFileHandling {
 public:
 	static const CFStringRef	kAUPresetFileDirName;
 	static const CFStringRef  	kAUPresetFileExtension;
-
+	static const CFStringRef  	kAUPresetNameKeyString;
+	static const CFStringRef  	kAUPresetDataKeyString;
 
 								CAAUPresetFile (CAComponent inComp, bool inShouldSearchNetwork);
 								virtual ~CAAUPresetFile();

@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -72,7 +72,9 @@ struct CAPropertyAddress
 
 //	Construction/Destruction
 public:
-						CAPropertyAddress()																													: AudioObjectPropertyAddress() { mSelector = 0; mScope = 0; mElement = 0; }
+						CAPropertyAddress()																													: AudioObjectPropertyAddress() { mSelector = 0; mScope = kAudioObjectPropertyScopeGlobal; mElement = kAudioObjectPropertyElementMaster; }
+						CAPropertyAddress(AudioObjectPropertySelector inSelector)																			: AudioObjectPropertyAddress() { mSelector = inSelector; mScope = kAudioObjectPropertyScopeGlobal; mElement = kAudioObjectPropertyElementMaster; }
+						CAPropertyAddress(AudioObjectPropertySelector inSelector, AudioObjectPropertyScope inScope)											: AudioObjectPropertyAddress() { mSelector = inSelector; mScope = inScope; mElement = kAudioObjectPropertyElementMaster; }
 						CAPropertyAddress(AudioObjectPropertySelector inSelector, AudioObjectPropertyScope inScope, AudioObjectPropertyElement inElement)   : AudioObjectPropertyAddress() { mSelector = inSelector; mScope = inScope; mElement = inElement; }
 						CAPropertyAddress(const AudioObjectPropertyAddress& inAddress)																		: AudioObjectPropertyAddress(inAddress){}
 						CAPropertyAddress(const CAPropertyAddress& inAddress)																				: AudioObjectPropertyAddress(inAddress){}
@@ -138,6 +140,8 @@ public:
 	bool								HasExactItem(const AudioObjectPropertyAddress& inAddress) const							{ AddressList::const_iterator theIterator = std::find_if(mAddressList.begin(), mAddressList.end(), std::bind1st(CAPropertyAddress::EqualTo(), inAddress)); return theIterator != mAddressList.end(); }
 
 	void								AppendItem(const AudioObjectPropertyAddress& inAddress)									{ mAddressList.push_back(inAddress); }
+	void								AppendUniqueItem(const AudioObjectPropertyAddress& inAddress)							{ if(!HasItem(inAddress)) { mAddressList.push_back(inAddress); } }
+	void								AppendUniqueExactItem(const AudioObjectPropertyAddress& inAddress)						{ if(!HasExactItem(inAddress)) { mAddressList.push_back(inAddress); } }
 	void								InsertItemAtIndex(UInt32 inIndex, const AudioObjectPropertyAddress& inAddress)			{ if(inIndex < mAddressList.size()) { AddressList::iterator theIterator = mAddressList.begin(); std::advance(theIterator, inIndex); mAddressList.insert(theIterator, inAddress); } else { mAddressList.push_back(inAddress); } }
 	void								EraseExactItem(const AudioObjectPropertyAddress& inAddress)								{ AddressList::iterator theIterator = std::find_if(mAddressList.begin(), mAddressList.end(), std::bind1st(CAPropertyAddress::EqualTo(), inAddress)); if(theIterator != mAddressList.end()) { mAddressList.erase(theIterator); } }
 	void								EraseItemAtIndex(UInt32 inIndex)														{ if(inIndex < mAddressList.size()) { AddressList::iterator theIterator = mAddressList.begin(); std::advance(theIterator, inIndex); mAddressList.erase(theIterator); } }

@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -44,26 +44,39 @@
 //	Includes
 //=============================================================================
 
+//	Self Include
 #include "CAPThread.h"
+
+//	PublicUtility Includes
 #include "CADebugMacros.h"
 #include "CAException.h"
 
-//	the extern "C" is to make cpp-precomp happy
-extern "C"
-{
-#include <mach/mach.h>
-}
+//	System Includes
+#if	TARGET_OS_MAC
+	#include <mach/mach.h>
+#endif
 
-//=============================================================================
+//	Standard Library Includes
+#include <stdio.h>
+
+//==================================================================================================
 //	CAPThread
-//
-//	This class wraps a pthread.
-//=============================================================================
+//==================================================================================================
+
+// returns the thread's priority as it was last set by the API
+#define CAPTHREAD_SET_PRIORITY				0
+// returns the thread's priority as it was last scheduled by the Kernel
+#define CAPTHREAD_SCHEDULED_PRIORITY		1
 
 CAPThread::CAPThread(ThreadRoutine inThreadRoutine, void* inParameter, UInt32 inPriority, bool inFixedPriority)
 :
+#if TARGET_OS_MAC
 	mPThread(0),
-    mSpawningThreadPriority(getThreadPriority(pthread_self(), CAPTHREAD_SET_PRIORITY)),
+    mSpawningThreadPriority(getScheduledPriority(pthread_self(), CAPTHREAD_SET_PRIORITY)),
+#elif TARGET_OS_WIN32
+	mThreadHandle(NULL),
+	mThreadID(0),
+#endif
 	mThreadRoutine(inThreadRoutine),
 	mThreadParameter(inParameter),
 	mPriority(inPriority),
@@ -78,8 +91,13 @@ CAPThread::CAPThread(ThreadRoutine inThreadRoutine, void* inParameter, UInt32 in
 
 CAPThread::CAPThread(ThreadRoutine inThreadRoutine, void* inParameter, UInt32 inPeriod, UInt32 inComputation, UInt32 inConstraint, bool inIsPreemptible)
 :
+#if TARGET_OS_MAC
 	mPThread(0),
-    mSpawningThreadPriority(getThreadPriority(pthread_self(), CAPTHREAD_SET_PRIORITY)),
+    mSpawningThreadPriority(getScheduledPriority(pthread_self(), CAPTHREAD_SET_PRIORITY)),
+#elif TARGET_OS_WIN32
+	mThreadHandle(NULL),
+	mThreadID(0),
+#endif
 	mThreadRoutine(inThreadRoutine),
 	mThreadParameter(inParameter),
 	mPriority(kDefaultThreadPriority),
@@ -98,7 +116,16 @@ CAPThread::~CAPThread()
 
 UInt32	CAPThread::GetScheduledPriority()
 {
-    return CAPThread::getThreadPriority ( mPThread, CAPTHREAD_SCHEDULED_PRIORITY );
+#if TARGET_OS_MAC
+    return CAPThread::getScheduledPriority( mPThread, CAPTHREAD_SCHEDULED_PRIORITY );
+#elif TARGET_OS_WIN32
+	UInt32 theAnswer = 0;
+	if(mThreadHandle != NULL)
+	{
+		theAnswer = GetThreadPriority(mThreadHandle);
+	}
+	return theAnswer;
+#endif
 }
 
 void	CAPThread::SetPriority(UInt32 inPriority, bool inFixedPriority)
@@ -106,14 +133,9 @@ void	CAPThread::SetPriority(UInt32 inPriority, bool inFixedPriority)
 	mPriority = inPriority;
 	mTimeConstraintSet = false;
 	mFixedPriority = inFixedPriority;
+#if TARGET_OS_MAC
 	if(mPThread != 0)
 	{
-        // We keep a reference to the spawning thread's priority around (initialized in the constructor), 
-        // and set the importance of the child thread relative to the spawning thread's priority.
-        thread_precedence_policy_data_t		thePrecedencePolicy;
-        
-        thePrecedencePolicy.importance = mPriority - mSpawningThreadPriority;
-        AssertNoError(thread_policy_set(pthread_mach_thread_np(mPThread), THREAD_PRECEDENCE_POLICY, (thread_policy_t)&thePrecedencePolicy, THREAD_PRECEDENCE_POLICY_COUNT), "CAPThread::SetPriority: failed to set the precedence policy");
 		
 		if (mFixedPriority)
 		{
@@ -121,7 +143,19 @@ void	CAPThread::SetPriority(UInt32 inPriority, bool inFixedPriority)
 			theFixedPolicy.timeshare = false;	// set to true for a non-fixed thread
 			AssertNoError(thread_policy_set(pthread_mach_thread_np(mPThread), THREAD_EXTENDED_POLICY, (thread_policy_t)&theFixedPolicy, THREAD_EXTENDED_POLICY_COUNT), "CAPThread::SetPriority: failed to set the fixed-priority policy");
 		}
-    }
+        // We keep a reference to the spawning thread's priority around (initialized in the constructor), 
+        // and set the importance of the child thread relative to the spawning thread's priority.
+        thread_precedence_policy_data_t		thePrecedencePolicy;
+        
+        thePrecedencePolicy.importance = mPriority - mSpawningThreadPriority;
+        AssertNoError(thread_policy_set(pthread_mach_thread_np(mPThread), THREAD_PRECEDENCE_POLICY, (thread_policy_t)&thePrecedencePolicy, THREAD_PRECEDENCE_POLICY_COUNT), "CAPThread::SetPriority: failed to set the precedence policy");
+    } 
+#elif TARGET_OS_WIN32
+	if(mThreadHandle != NULL)
+	{
+		SetThreadPriority(mThreadHandle, mPriority);
+	}
+#endif
 }
 
 void	CAPThread::SetTimeConstraints(UInt32 inPeriod, UInt32 inComputation, UInt32 inConstraint, bool inIsPreemptible)
@@ -131,6 +165,7 @@ void	CAPThread::SetTimeConstraints(UInt32 inPeriod, UInt32 inComputation, UInt32
 	mConstraint = inConstraint;
 	mIsPreemptible = inIsPreemptible;
 	mTimeConstraintSet = true;
+#if TARGET_OS_MAC
 	if(mPThread != 0)
 	{
 		thread_time_constraint_policy_data_t thePolicy;
@@ -140,10 +175,17 @@ void	CAPThread::SetTimeConstraints(UInt32 inPeriod, UInt32 inComputation, UInt32
 		thePolicy.preemptible = mIsPreemptible;
 		AssertNoError(thread_policy_set(pthread_mach_thread_np(mPThread), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&thePolicy, THREAD_TIME_CONSTRAINT_POLICY_COUNT), "CAPThread::SetTimeConstraints: thread_policy_set failed");
 	}
+#elif TARGET_OS_WIN32
+	if(mThreadHandle != NULL)
+	{
+		SetThreadPriority(mThreadHandle, THREAD_PRIORITY_TIME_CRITICAL);
+	}
+#endif
 }
 
 void	CAPThread::Start()
 {
+#if TARGET_OS_MAC
 	if(mPThread == 0)
 	{
 		OSStatus			theResult;
@@ -156,36 +198,59 @@ void	CAPThread::Start()
 		ThrowIf(theResult != 0, CAException(theResult), "CAPThread::Start: A thread could not be created in the detached state.");
 		
 		theResult = pthread_create(&mPThread, &theThreadAttributes, (ThreadRoutine)CAPThread::Entry, this);
-		ThrowIf(theResult != 0, CAException(theResult), "CAPThread::Start: Could not create a thread.");
+		ThrowIf(theResult != 0 || !mPThread, CAException(theResult), "CAPThread::Start: Could not create a thread.");
 		
 		pthread_attr_destroy(&theThreadAttributes);
 		
-		if(mTimeConstraintSet)
-		{
-			SetTimeConstraints(mPeriod, mComputation, mConstraint, mIsPreemptible);
-		}
-		else
-		{
-			SetPriority(mPriority, mFixedPriority);
-		}
 	}
+#elif TARGET_OS_WIN32
+	if(mThreadID == 0)
+	{
+		//	clean up the existing thread handle
+		if(mThreadHandle != NULL)
+		{
+			CloseHandle(mThreadHandle);
+			mThreadHandle = NULL;
+		}
+		
+		//	create a new thread
+		mThreadHandle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Entry, this, 0, &mThreadID);
+		ThrowIf(mThreadHandle == NULL, CAException(GetLastError()), "CAPThread::Start: Could not create a thread.");
+	}
+#endif
 }
+
+#if TARGET_OS_MAC
 
 void*	CAPThread::Entry(CAPThread* inCAPThread)
 {
 	void* theAnswer = NULL;
-	if(inCAPThread->mThreadRoutine != NULL)
+
+	try 
 	{
-		theAnswer = inCAPThread->mThreadRoutine(inCAPThread->mThreadParameter);
+		if(inCAPThread->mTimeConstraintSet)
+		{
+			inCAPThread->SetTimeConstraints(inCAPThread->mPeriod, inCAPThread->mComputation, inCAPThread->mConstraint, inCAPThread->mIsPreemptible);
+		}
+		else
+		{
+			inCAPThread->SetPriority(inCAPThread->mPriority, inCAPThread->mFixedPriority);
+		}
+
+		if(inCAPThread->mThreadRoutine != NULL)
+		{
+			theAnswer = inCAPThread->mThreadRoutine(inCAPThread->mThreadParameter);
+		}
+	}
+	catch (...)
+	{
+		// what should be done here?
 	}
 	inCAPThread->mPThread = 0;
 	return theAnswer;
 }
 
-//========================================================================
-// Thread Priority Get
-//========================================================================
-UInt32 CAPThread::getThreadPriority (pthread_t inThread, int inPriorityKind)
+UInt32 CAPThread::getScheduledPriority(pthread_t inThread, int inPriorityKind)
 {
     thread_basic_info_data_t			threadInfo;
 	policy_info_data_t					thePolicyInfo;
@@ -229,3 +294,42 @@ UInt32 CAPThread::getThreadPriority (pthread_t inThread, int inPriorityKind)
     
     return 0;
 }
+
+#elif TARGET_OS_WIN32
+
+UInt32 WINAPI	CAPThread::Entry(CAPThread* inCAPThread)
+{
+	UInt32 theAnswer = 0;
+
+	try 
+	{
+		if(inCAPThread->mTimeConstraintSet)
+		{
+			inCAPThread->SetTimeConstraints(inCAPThread->mPeriod, inCAPThread->mComputation, inCAPThread->mConstraint, inCAPThread->mIsPreemptible);
+		}
+		else
+		{
+			inCAPThread->SetPriority(inCAPThread->mPriority, inCAPThread->mFixedPriority);
+		}
+
+		if(inCAPThread->mThreadRoutine != NULL)
+		{
+			theAnswer = reinterpret_cast<UInt32>(inCAPThread->mThreadRoutine(inCAPThread->mThreadParameter));
+		}
+		inCAPThread->mThreadID = 0;
+	}
+	catch (...)
+	{
+		// what should be done here?
+	}
+	return theAnswer;
+}
+
+//	a definition of this function here for now
+extern "C"
+Boolean CompareAndSwap(UInt32 inOldValue, UInt32 inNewValue, UInt32* inOldValuePtr)
+{
+	return InterlockedCompareExchange((volatile LONG*)inOldValuePtr, inNewValue, inOldValue) == inOldValue;
+}
+
+#endif

@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -56,7 +56,7 @@ public:
 	void	Stop();	
 
 	void	SetFile(AudioFileID fileID);
-	void	SetFile(const char *recordFilePath, AudioFileTypeID filetype, const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout);
+	void	SetFile(const FSRef &parentFSRef, CFStringRef filename, AudioFileTypeID filetype, const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout);
 
 	const CAStreamBasicDescription &	IODataFormat() { return mInputDataFormat; }
 

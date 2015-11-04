@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -43,8 +43,8 @@
 #include "CAAudioFilePlayer.h"
 #include "CAXException.h"
 
-CAAudioFilePlayer::CAAudioFilePlayer(int nBuffers, UInt32 bufferSizeBytes) :
-	CAAudioFileReader(nBuffers, bufferSizeBytes),
+CAAudioFilePlayer::CAAudioFilePlayer(int nBuffers, UInt32 bufferSizeFrames) :
+	CAAudioFileReader(nBuffers, bufferSizeFrames),
 	mOutputUnit(NULL)
 {
 	// open output unit
@@ -57,9 +57,32 @@ CAAudioFilePlayer::CAAudioFilePlayer(int nBuffers, UInt32 bufferSizeBytes) :
 	desc.componentFlags = 0;
 	desc.componentFlagsMask = 0;
 	comp = FindNextComponent(NULL, &desc);
+	
+	//	if we can't find the default one, look explicitly for AUHAL
+	if(comp == NULL)
+	{
+		desc.componentType = kAudioUnitType_Output;
+		desc.componentSubType = kAudioUnitSubType_HALOutput;
+		desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+		desc.componentFlags = 0;
+		desc.componentFlagsMask = 0;
+		comp = FindNextComponent(NULL, &desc);
+	}
+	
 	XThrowIf(comp == NULL, -1, "find audio output unit");
 	XThrowIfError(OpenAComponent(comp, &mOutputUnit), "open audio output unit");
 	XThrowIfError(AudioUnitInitialize(mOutputUnit), "initialize audio output unit");
+
+#if 0
+	AudioStreamBasicDescription theFormat;
+	UInt32 theSize = sizeof(AudioStreamBasicDescription);
+	AudioUnitGetProperty(mOutputUnit, 'sfmt', kAudioUnitScope_Output, 0, &theFormat, &theSize);
+	
+	theFormat.mChannelsPerFrame = 6;
+	theFormat.mBytesPerFrame = theFormat.mChannelsPerFrame * (theFormat.mBitsPerChannel / 8);
+	theFormat.mBytesPerPacket = theFormat.mBytesPerFrame;	
+	AudioUnitSetProperty(mOutputUnit, 'sfmt', kAudioUnitScope_Output, 0, &theFormat, theSize);
+#endif
 }
 
 CAAudioFilePlayer::~CAAudioFilePlayer()
@@ -68,10 +91,10 @@ CAAudioFilePlayer::~CAAudioFilePlayer()
 		CloseComponent(mOutputUnit);
 }
 
-void	CAAudioFilePlayer::SetFile(AudioFileID fileID)
+void	CAAudioFilePlayer::SetFile(const FSRef &inFile)
 {
 	Stop();
-	CAAudioFileReader::SetFile(fileID);
+	CAAudioFileReader::SetFile(inFile);
 	SetupChannelMapping();
 }
 

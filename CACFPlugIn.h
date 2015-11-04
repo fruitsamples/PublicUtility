@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -82,6 +82,7 @@ public:
 	
 	CFBundleRef		GetBundle() const													{ CFBundleRef theAnswer = NULL; if(IsValid()) { theAnswer = CFPlugInGetBundle(mCFPlugIn); } return theAnswer; }
 	CFStringRef		CopyBundleID() const												{ CFStringRef theAnswer = NULL; CFBundleRef theBundle = GetBundle(); if(IsValid() && (theBundle != NULL)) { theAnswer = CFBundleGetIdentifier(theBundle); if(theAnswer != NULL) { CFRetain(theAnswer); } } return theAnswer; }
+	UInt32			GetBundleVersion() const											{ UInt32 theAnswer = 0; CFBundleRef theBundle = GetBundle(); if(IsValid() && (theBundle != NULL)) { theAnswer = CFBundleGetVersionNumber(theBundle); } return theAnswer; }
 	CFDictionaryRef CopyBundleInfo() const												{ CFDictionaryRef theAnswer = NULL; CFBundleRef theBundle = GetBundle(); if(IsValid() && (theBundle != NULL)) { theAnswer = CFBundleGetInfoDictionary(theBundle); if(theAnswer != NULL) { CFRetain(theAnswer); } } return theAnswer; }
 	CFArrayRef		FindFactoriesForType(CFUUIDRef inTypeUUID) const					{ CFArrayRef theAnswer = NULL; if(IsValid()) { theAnswer = CFPlugInFindFactoriesForPlugInTypeInPlugIn(inTypeUUID, mCFPlugIn); } return theAnswer; }
 

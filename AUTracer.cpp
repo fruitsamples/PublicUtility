@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -119,8 +119,8 @@ OSStatus	AUTracer::Establish (AudioUnit inUnit, char* inFName, Float64 inSpikeLi
 		mAU = inUnit;
 			
 			// lets do this one to just load this code...
-		mProfiler->Capture((CAHostTimeBase::GetCurrentTime() - s1msec), 
-							CAHostTimeBase::GetCurrentTime(), 
+		mProfiler->Capture((CAHostTimeBase::GetTheCurrentTime() - s1msec), 
+							CAHostTimeBase::GetTheCurrentTime(), 
 							false, "DUMMY TRACE");
 
 
@@ -131,7 +131,7 @@ OSStatus	AUTracer::Establish (AudioUnit inUnit, char* inFName, Float64 inSpikeLi
 		sTimeOut *= secsBetweenTraces;
 		
 			// we start doing this straight away...
-		mLastTimeWrote = CAHostTimeBase::ConvertFromNanos (CAHostTimeBase::ConvertToNanos (CAHostTimeBase::GetCurrentTime() - (sTimeOut * 2)));
+		mLastTimeWrote = CAHostTimeBase::ConvertFromNanos (CAHostTimeBase::ConvertToNanos (CAHostTimeBase::GetTheCurrentTime() - (sTimeOut * 2)));
 
 		UInt32 dataSize = sizeof (Float64);
 		require_noerr (result = AudioUnitGetProperty (inUnit, kAudioUnitProperty_SampleRate,
@@ -142,9 +142,13 @@ home:
 	return result;
 }
 
-void 		AUTracer::SampleRateListener (void *inRefCon, AudioUnit ci, AudioUnitPropertyID inID, AudioUnitScope inScope, AudioUnitElement inElement)
+void 		AUTracer::SampleRateListener (void			*inRefCon, 
+									AudioUnit			ci, 
+									AudioUnitPropertyID inID, 
+									AudioUnitScope		inScope, 
+									AudioUnitElement	/*inElement*/)
 {
-	if (inScope == kAudioUnitScope_Output) {
+	if (inScope == kAudioUnitScope_Output && inID == kAudioUnitProperty_SampleRate) {
 		AUTracer* This = static_cast<AUTracer*>(inRefCon);
 		UInt32 dataSize = sizeof (Float64);
 		AudioUnitGetProperty (ci, kAudioUnitProperty_SampleRate,
@@ -153,27 +157,27 @@ void 		AUTracer::SampleRateListener (void *inRefCon, AudioUnit ci, AudioUnitProp
 }
 
 OSStatus 	AUTracer::OverloadTagger (void 							*inRefCon, 
-										AudioUnitRenderActionFlags *ioActionFlags, 
-										const AudioTimeStamp 		*inTimeStamp, 
+										AudioUnitRenderActionFlags  *ioActionFlags, 
+										const AudioTimeStamp 		* /*inTimeStamp*/, 
 										UInt32 						inBusNumber, 
-										UInt32 						inNumberFrames, 
-										AudioBufferList 			*ioData)
+										UInt32 						/*inNumberFrames*/, 
+										AudioBufferList 			* /*ioData*/)
 {
 	if (inBusNumber == 0) {
 		if ((*ioActionFlags & kAudioUnitRenderAction_PreRender)) {
-			AUTracer *This = (AUTracer*)inRefCon;
+			AUTracer* This = static_cast<AUTracer*>(inRefCon);
 			syscall(180, startTrace, 0, 0, 0, 0);
-			This->mProfileRenderStartTime = CAHostTimeBase::GetCurrentTime();
+			This->mProfileRenderStartTime = CAHostTimeBase::GetTheCurrentTime();
 		}
 	}
 	return noErr;
 }
 
 
-OSStatus 	AUTracer::OverlaodListenerProc(	AudioDeviceID	inDevice,
-									UInt32					inChannel,
-									Boolean					isInput,
-									AudioDevicePropertyID	inPropertyID,
+OSStatus 	AUTracer::OverlaodListenerProc(	AudioDeviceID	/*inDevice*/,
+									UInt32					/*inChannel*/,
+									Boolean					/*isInput*/,
+									AudioDevicePropertyID	/*inPropertyID*/,
 									void*					inClientData)
 {
 	AUTracer* This = static_cast<AUTracer*>(inClientData);
@@ -183,7 +187,7 @@ OSStatus 	AUTracer::OverlaodListenerProc(	AudioDeviceID	inDevice,
 
 void			AUTracer::DoOverload ()
 {
-	UInt64 now = CAHostTimeBase::GetCurrentTime();
+	UInt64 now = CAHostTimeBase::GetTheCurrentTime();
 
 	UInt64 isWindow = CAHostTimeBase::ConvertToNanos (mLastTimeWrote) + sTimeOut;
 	if (isWindow > CAHostTimeBase::CAHostTimeBase::ConvertToNanos(now))
@@ -194,7 +198,7 @@ void			AUTracer::DoOverload ()
 //	UInt64 elapseTime = UInt64 ((1024.0 / GetSampleRate()) * 1000000000.0);
 //	UInt64 htElapseTime = CAHostTimeBase::ConvertFromNanos (elapseTime);
 
-	mLastTimeWrote = CAHostTimeBase::GetCurrentTime();
+	mLastTimeWrote = CAHostTimeBase::GetTheCurrentTime();
 	
 	mProfiler->Capture((mProfileRenderStartTime - s1msec), mLastTimeWrote, true, "Captured Latency Log for I/O Cycle Overload\n");
 }
@@ -204,16 +208,16 @@ void			AUTracer::DoOverload ()
   
 OSStatus 		AUTracer::CPUSpikeProfiler (void 			*inRefCon, 
 								AudioUnitRenderActionFlags 	*ioActionFlags, 
-								const AudioTimeStamp 		*inTimeStamp, 
+								const AudioTimeStamp 		* /*inTimeStamp*/, 
 								UInt32 						inBusNumber, 
 								UInt32 						inNumberFrames, 
-								AudioBufferList 			*ioData)
+								AudioBufferList 			* /*ioData*/)
 {		
 	if (inBusNumber == 0) {
 		if ((*ioActionFlags & kAudioUnitRenderAction_PreRender)) {
 			AUTracer *This = (AUTracer*)inRefCon;
 			syscall(180, startTrace, 0, 0, 0, 0);
-			This->mProfileRenderStartTime = CAHostTimeBase::GetCurrentTime();
+			This->mProfileRenderStartTime = CAHostTimeBase::GetTheCurrentTime();
 		} else if (*ioActionFlags & kAudioUnitRenderAction_PostRender) {
 			AUTracer *This = (AUTracer*)inRefCon;
 			This->DoSpikeAnalysis (inNumberFrames);
@@ -224,7 +228,7 @@ OSStatus 		AUTracer::CPUSpikeProfiler (void 			*inRefCon,
 
 void		AUTracer::DoSpikeAnalysis (UInt32 inNumberFrames)
 {
-	UInt64 now = CAHostTimeBase::GetCurrentTime();
+	UInt64 now = CAHostTimeBase::GetTheCurrentTime();
 	Float64 iocycleTime = inNumberFrames / GetSampleRate() * 1000000000.0;
 	Float64 nanosUsage = CAHostTimeBase::ConvertToNanos(now - mProfileRenderStartTime);
 	Float64 usage = nanosUsage / iocycleTime;
@@ -244,7 +248,7 @@ void		AUTracer::DoSpikeAnalysis (UInt32 inNumberFrames)
 				int(mSpikeLimit * 100 + 0.5), (iocycleTime * mSpikeLimit / 1000.0), 
 				inNumberFrames, (int)GetSampleRate(), (iocycleTime / 1000.0), howLongAgoWrote);
 		
-		mLastTimeWrote = CAHostTimeBase::GetCurrentTime();
+		mLastTimeWrote = CAHostTimeBase::GetTheCurrentTime();
 		mProfiler->Capture ((mProfileRenderStartTime - s1msec), mLastTimeWrote, true, string);
 		
 		printf ("%s", string);

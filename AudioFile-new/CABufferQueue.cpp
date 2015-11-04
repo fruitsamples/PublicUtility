@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -42,6 +42,10 @@
 
 #include "CABufferQueue.h"
 
+#if TARGET_OS_WIN32
+	#include "CAWindows.h"
+#endif
+
 // ____________________________________________________________________________
 
 CABufferQueue::WorkThread *CABufferQueue::sWorkThread = NULL;
@@ -49,7 +53,7 @@ CABufferQueue::WorkThread *CABufferQueue::sWorkThread = NULL;
 CABufferQueue::WorkThread::WorkThread() :
 	CAPThread(ThreadEntry, this, CAPThread::kMaxThreadPriority, true),
 	mStopped(false),
-	mRunGuard("mRunGuard")
+	mRunGuard("CABufferQueue::mRunGuard")
 {
 	// prime the container to have some elements so we're not calling malloc dynamically
 	Buffer *b = NULL;
@@ -66,10 +70,18 @@ void	CABufferQueue::WorkThread::Run()
 		mRunGuard.Wait();
 		
 		while (!mStopped) {
-			Buffer *b;
+			Buffer *b, *next;
 			
 			// add buffers from the other thread
-			while ((b = mBuffersToAdd.pop_atomic()) != NULL)
+			TAtomicStack<Buffer> reversed;
+			
+			b = mBuffersToAdd.pop_all();	// these are in reverse order
+			while (b != NULL) {
+				next = b->get_next();
+				reversed.push_NA(b);
+				b = next;
+			}
+			while ((b = reversed.pop_NA()) != NULL)
 				mWorkQueue.push_back(b);
 			
 			if (mWorkQueue.empty())
@@ -287,8 +299,11 @@ void	CAPullBufferQueue::PullBuffer(UInt32 &ioFrames, AudioBufferList *outBufferL
 void	CAPullBufferQueue::Prime()
 {
 	mEndOfStream = false;
-	for (int i = 0; i < mNumberBuffers; ++i)
-		ProcessBuffer(mBuffers[i]);
+	for (int i = 0; i < mNumberBuffers; ++i) {
+		Buffer *b = mBuffers[i];
+		ProcessBuffer(b);
+		b->SetInProgress(false);
+	}
 	mCurrentBuffer = 0;
 }
 

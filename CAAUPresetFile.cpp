@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -44,6 +44,11 @@
 
 const CFStringRef  	CAAUPresetFile::kAUPresetFileExtension = CFSTR("aupreset");
 const CFStringRef 	CAAUPresetFile::kAUPresetFileDirName = CFSTR("Presets");
+const CFStringRef   CAAUPresetFile::kAUPresetNameKeyString = CFSTR(kAUPresetNameKey);
+const CFStringRef   CAAUPresetFile::kAUPresetDataKeyString = CFSTR(kAUPresetDataKey);
+
+static const CFStringRef	kAUUnknownName = CFSTR("Unnamed Audio Unit");
+static const CFStringRef	kAUUnknownMfr = CFSTR("Unknown Manufacturer");
 
 CAAUPresetFile::CAAUPresetFile (CAComponent inComp, bool inShouldSearchNetwork)
 	: CAFileHandling(CAAUPresetFile::kAUPresetFileDirName, inShouldSearchNetwork),
@@ -51,12 +56,19 @@ CAAUPresetFile::CAAUPresetFile (CAComponent inComp, bool inShouldSearchNetwork)
 {
 	CFStringRef name = mComp.GetAUName();
 	CFStringRef manu = mComp.GetAUManu();
+	
 	if (!name && !manu) {
 		SetUserDir (NULL);
 		SetLocalDir (NULL);
 		SetNetworkDir (NULL);
 		return;
 	}
+	
+	if (!name)
+		name = kAUUnknownName;
+	
+	if (!manu)
+		manu = kAUUnknownMfr;
 	
 	FSRef ref;
 	
@@ -101,6 +113,12 @@ OSStatus		CAAUPresetFile::CreateSubDirectories (FSRef &inParentRef, SInt16 inDom
 	CFStringRef manu = mComp.GetAUManu();
 	if (!name && !manu)
 		return -1;
+	
+	if (!name)
+		name = kAUUnknownName;
+	
+	if (!manu)
+		manu = kAUUnknownMfr;
 	
 	OSStatus result;
 	FSRef ref;

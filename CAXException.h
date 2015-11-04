@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -43,8 +43,16 @@
 #ifndef __CAXException_h__
 #define __CAXException_h__
 
-#include <CoreServices/CoreServices.h>
+#if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
+	#include <CoreServices/CoreServices.h>
+#else
+	#include <ConditionalMacros.h>
+	#include <CoreServices.h>
+#endif
 #include "CADebugMacros.h"
+#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
 
 // An extended exception class that includes the name of the failed operation
 class CAXException {
@@ -52,7 +60,9 @@ public:
 	CAXException(const char *operation, OSStatus err) :
 		mError(err)
 		{
-			if (strlen(operation) >= sizeof(mOperation)) {
+			if (operation == NULL)
+				mOperation[0] = '\0';
+			else if (strlen(operation) >= sizeof(mOperation)) {
 				memcpy(mOperation, operation, sizeof(mOperation) - 1);
 				mOperation[sizeof(mOperation) - 1] = '\0';
 			} else
@@ -103,45 +113,46 @@ private:
 #if	DEBUG || CoreAudio_Debug
 	#define XThrowIfError(error, operation) \
 		do {																	\
-			OSStatus _err = error;												\
-			if (_err) {															\
-				char buf[12];													\
-				DebugMessageN2("error %s: %4s\n", CAXException::FormatError(buf, _err), operation);\
+			OSStatus __err = error;												\
+			if (__err) {															\
+				char __buf[12];													\
+				DebugMessageN2("error %s: %4s\n", CAXException::FormatError(__buf, __err), operation);\
 				STOP;															\
-				throw CAXException(operation, _err);		\
+				throw CAXException(operation, __err);		\
 			}																	\
 		} while (0)
 
 	#define XThrowIf(condition, error, operation) \
 		do {																	\
 			if (condition) {													\
-				OSStatus _err = error;											\
-				char buf[12];													\
-				DebugMessageN2("error %s: %4s\n", CAXException::FormatError(buf, _err), operation);\
+				OSStatus __err = error;											\
+				char __buf[12];													\
+				DebugMessageN2("error %s: %4s\n", CAXException::FormatError(__buf, __err), operation);\
 				STOP;															\
-				throw CAXException(operation, _err);		\
+				throw CAXException(operation, __err);		\
 			}																	\
 		} while (0)
 
 #else
 	#define XThrowIfError(error, operation) \
 		do {																	\
-			OSStatus _err = error;												\
-			if (_err) {															\
-				throw CAXException(operation, _err);		\
+			OSStatus __err = error;												\
+			if (__err) {															\
+				throw CAXException(operation, __err);		\
 			}																	\
 		} while (0)
 
 	#define XThrowIf(condition, error, operation) \
 		do {																	\
 			if (condition) {													\
-				OSStatus _err = error;											\
-				throw CAXException(operation, _err);		\
+				OSStatus __err = error;											\
+				throw CAXException(operation, __err);		\
 			}																	\
 		} while (0)
 
 #endif
 
 #define XThrow(error, operation) XThrowIf(true, error, operation)
+#define XThrowIfErr(error) XThrowIfError(error, #error)
 
 #endif // __CAXException_h__

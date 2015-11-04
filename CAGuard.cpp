@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -35,19 +35,30 @@
 			(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
 			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
+/*==================================================================================================
 	CAGuard.cpp
 
-=============================================================================*/
+==================================================================================================*/
 
-//=============================================================================
+//==================================================================================================
 //	Includes
-//=============================================================================
+//==================================================================================================
 
+//	Self Include
 #include "CAGuard.h"
+
+#if TARGET_OS_MAC
+	#include <errno.h>
+#endif
+
+//	PublicUtility Inludes
 #include "CADebugMacros.h"
 #include "CAException.h"
 #include "CAHostTimeBase.h"
+
+//==================================================================================================
+//	Logging
+//==================================================================================================
 
 #if CoreAudio_Debug
 //	#define	Log_Ownership		1
@@ -58,9 +69,9 @@
 #endif
 
 //#warning		Need a try-based Locker too
-//=============================================================================
+//==================================================================================================
 //	CAGuard
-//=============================================================================
+//==================================================================================================
 
 CAGuard::CAGuard(const char* inName)
 :
@@ -70,17 +81,30 @@ CAGuard::CAGuard(const char* inName)
 	mAverageLatencyCount(0)
 #endif
 {
+#if TARGET_OS_MAC
 	OSStatus theError = pthread_cond_init(&mCondVar, NULL);
 	ThrowIf(theError != 0, CAException(theError), "CAGuard::CAGuard: Could not init the cond var");
+#elif TARGET_OS_WIN32
+	mEvent = CreateEvent(NULL, true, false, NULL);
+	ThrowIfNULL(mEvent, CAException(GetLastError()), "CAGuard::CAGuard: Could not create the event");
+#endif
 }
 
 CAGuard::~CAGuard()
 {
+#if TARGET_OS_MAC
 	pthread_cond_destroy(&mCondVar);
+#elif TARGET_OS_WIN32
+	if(mEvent != NULL)
+	{
+		CloseHandle(mEvent);
+	}
+#endif
 }
 
 void	CAGuard::Wait()
 {
+#if TARGET_OS_MAC
 	ThrowIf(!pthread_equal(pthread_self(), mOwner), CAException(1), "CAGuard::Wait: A thread has to have locked a guard before it can wait");
 
 	mOwner = 0;
@@ -96,10 +120,33 @@ void	CAGuard::Wait()
 	#if	Log_WaitOwnership
 		DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAGuard::Wait: thread %p waited on %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
 	#endif
+#elif TARGET_OS_WIN32
+	ThrowIf(GetCurrentThreadId() != mOwner, CAException(1), "CAGuard::Wait: A thread has to have locked a guard before it can wait");
+
+	mOwner = 0;
+
+	#if	Log_WaitOwnership
+		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAGuard::Wait: thread %lu is waiting on %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+	#endif
+
+	ReleaseMutex(mMutex);
+	HANDLE theHandles[] = { mMutex, mEvent };
+	OSStatus theError = WaitForMultipleObjects(2, theHandles, true, INFINITE);
+	ThrowIfError(theError, CAException(GetLastError()), "CAGuard::Wait: Could not wait for the signal");
+	mOwner = GetCurrentThreadId();
+	ResetEvent(mEvent);
+
+	#if	Log_WaitOwnership
+		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAGuard::Wait: thread %lu waited on %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+	#endif
+#endif
 }
 
 bool	CAGuard::WaitFor(UInt64 inNanos)
 {
+	bool theAnswer = false;
+
+#if TARGET_OS_MAC
 	ThrowIf(!pthread_equal(pthread_self(), mOwner), CAException(1), "CAGuard::WaitFor: A thread has to have locked a guard be for it can wait");
 
 	#if	Log_TimedWaits
@@ -160,7 +207,65 @@ bool	CAGuard::WaitFor(UInt64 inNanos)
 		DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAGuard::WaitFor: thread %p waited on %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
 	#endif
 
-	return theError == ETIMEDOUT;
+	theAnswer = theError == ETIMEDOUT;
+#elif TARGET_OS_WIN32
+	ThrowIf(GetCurrentThreadId() != mOwner, CAException(1), "CAGuard::WaitFor: A thread has to have locked a guard be for it can wait");
+
+	#if	Log_TimedWaits
+		DebugMessageN1("CAGuard::WaitFor: waiting %.0f", (Float64)inNanos);
+	#endif
+
+	//	the time out is specified in milliseconds(!)
+	UInt32 theWaitTime = static_cast<UInt32>(inNanos / 1000000ULL);
+
+	#if	Log_TimedWaits || Log_Latency || Log_Average_Latency
+		UInt64	theStartNanos = CAHostTimeBase::GetCurrentTimeInNanos();
+	#endif
+
+	mOwner = 0;
+
+	#if	Log_WaitOwnership
+		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAGuard::WaitFor: thread %lu is waiting on %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+	#endif
+	
+	ReleaseMutex(mMutex);
+	HANDLE theHandles[] = { mMutex, mEvent };
+	OSStatus theError = WaitForMultipleObjects(2, theHandles, true, theWaitTime);
+	ThrowIf((theError != WAIT_OBJECT_0) && (theError != WAIT_TIMEOUT), CAException(GetLastError()), "CAGuard::WaitFor: Wait got an error");
+	mOwner = GetCurrentThreadId();
+	ResetEvent(mEvent);
+	
+	#if	Log_TimedWaits || Log_Latency || Log_Average_Latency
+		UInt64	theEndNanos = CAHostTimeBase::GetCurrentTimeInNanos();
+	#endif
+	
+	#if	Log_TimedWaits
+		DebugMessageN1("CAGuard::WaitFor: waited  %.0f", (Float64)(theEndNanos - theStartNanos));
+	#endif
+	
+	#if	Log_Latency
+		DebugMessageN1("CAGuard::WaitFor: latency  %.0f", (Float64)((theEndNanos - theStartNanos) - inNanos));
+	#endif
+	
+	#if	Log_Average_Latency
+		++mAverageLatencyCount;
+		mAverageLatencyAccumulator += (theEndNanos - theStartNanos) - inNanos;
+		if(mAverageLatencyCount >= 50)
+		{
+			DebugMessageN2("CAGuard::WaitFor: average latency  %.3f ns over %ld waits", mAverageLatencyAccumulator / mAverageLatencyCount, mAverageLatencyCount);
+			mAverageLatencyCount = 0;
+			mAverageLatencyAccumulator = 0.0;
+		}
+	#endif
+
+	#if	Log_WaitOwnership
+		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAGuard::WaitFor: thread %lu waited on %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+	#endif
+
+	theAnswer = theError == WAIT_TIMEOUT;
+#endif
+
+	return theAnswer;
 }
 
 bool	CAGuard::WaitUntil(UInt64 inNanos)
@@ -194,20 +299,36 @@ bool	CAGuard::WaitUntil(UInt64 inNanos)
 
 void	CAGuard::Notify()
 {
+#if TARGET_OS_MAC
 	#if	Log_WaitOwnership
 		DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAGuard::Notify: thread %p is notifying %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
 	#endif
 
 	OSStatus theError = pthread_cond_signal(&mCondVar);
 	ThrowIf(theError != 0, CAException(theError), "CAGuard::Notify: failed");
+#elif TARGET_OS_WIN32
+	#if	Log_WaitOwnership
+		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAGuard::Notify: thread %lu is notifying %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+	#endif
+	
+	SetEvent(mEvent);
+#endif
 }
 
 void	CAGuard::NotifyAll()
 {
+#if TARGET_OS_MAC
 	#if	Log_WaitOwnership
 		DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAGuard::NotifyAll: thread %p is notifying %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
 	#endif
 
 	OSStatus theError = pthread_cond_broadcast(&mCondVar);
 	ThrowIf(theError != 0, CAException(theError), "CAGuard::NotifyAll: failed");
+#elif TARGET_OS_WIN32
+	#if	Log_WaitOwnership
+		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAGuard::NotifyAll: thread %lu is notifying %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+	#endif
+	
+	SetEvent(mEvent);
+#endif
 }

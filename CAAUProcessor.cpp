@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -293,6 +293,7 @@ OSStatus	CAAUProcessor::Preflight (bool inProcessPreceedingTail)
 		// the time stamp we use with the AU Render - only sample count is valid
 		memset (&mRenderTimeStamp, 0, sizeof(mRenderTimeStamp));
 		mRenderTimeStamp.mFlags = kAudioTimeStampSampleTimeValid;
+		mUnit.GlobalReset();
 	}
 
 	UInt32 numFrames = MaxFramesPerRender();

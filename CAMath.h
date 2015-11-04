@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -43,7 +43,11 @@
 #ifndef __CAMath_h__
 #define __CAMath_h__
 
-#include <CoreAudio/CoreAudioTypes.h>
+#if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
+	#include <CoreAudio/CoreAudioTypes.h>
+#else
+	#include <CoreAudioTypes.h>
+#endif
 
 inline bool fiszero(Float64 f) { return (f == 0.); }
 inline bool fiszero(Float32 f) { return (f == 0.f); }

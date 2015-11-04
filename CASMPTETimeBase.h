@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -43,7 +43,13 @@
 #ifndef __CASMPTETimeBase_h__
 #define __CASMPTETimeBase_h__
 
-#include <CoreAudio/CoreAudioTypes.h>
+#if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
+	#include <CoreAudio/CoreAudioTypes.h>
+#else
+	#include <CoreAudioTypes.h>
+#endif
+
+typedef UInt32 SMPTE_HMSF;  // nibbles: hhmmssff
 
 class CASMPTETimeBase {
 public:
@@ -62,19 +68,19 @@ public:
 
 	// Conversions
 
-	void	SecondsToSMPTERep(  Float64					inSeconds,
+	void	SecondsToSMPTETime( Float64					inSeconds,
 								UInt16					inSubframeDivisor,
-								SMPTETime &				outSMPTETime);
+								SMPTETime &				outSMPTETime) const;
 	
-	bool	SMPTERepToSeconds(  const SMPTETime &		inSMPTETime,
-								Float64 &				outSeconds);
+	bool	SMPTETimeToSeconds( const SMPTETime &		inSMPTETime,
+								Float64 &				outSeconds) const;
 				// return true for success; false if the smpte time is invalid
 				// This member method ignores inSMPTETime's mType.
 	
-	UInt32  ParseFrame(			UInt32					inHMSF);
+	UInt32		HMSFToAbsoluteFrame(SMPTE_HMSF			inHMSF) const;
 				// convert a 32-bit hhmmssff representation to number of frames since 0
-				
-	UInt32  IncrementFrame(		UInt32					inHMSF);
+	
+	SMPTE_HMSF  AdvanceFrame(		SMPTE_HMSF			inHMSF, int nToAdvance) const;
 				// increment a 32-bit hhmmssff representation to the next frame number, returning it
 	
 private:

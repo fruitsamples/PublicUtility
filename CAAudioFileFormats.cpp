@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -42,6 +42,7 @@
 
 #include "CAAudioFileFormats.h"
 #include <algorithm>
+#include <ctype.h>
 
 CAAudioFileFormats *CAAudioFileFormats::sInstance = NULL;
 
@@ -196,25 +197,61 @@ bail:
 	delete[] writableFormats;
 }
 
-
-// $$$ there's more to do here
-
-bool	CAAudioFileFormats::InferDataFormatFromFileFormat(OSType filetype, CAStreamBasicDescription &fmt)
+// note that the outgoing format will have zero for the sample rate, channels per frame, bytesPerPacket, bytesPerFrame
+bool	CAAudioFileFormats::InferDataFormatFromFileFormat(AudioFileTypeID filetype, CAStreamBasicDescription &fmt)
 {
 	// if the file format only supports one data format
 	for (int i = 0; i < mNumFileFormats; ++i) {
 		FileFormatInfo *ffi = &mFileFormats[i];
 		if (ffi->mFileTypeID == filetype && ffi->mNumDataFormats == 1) {
+			DataFormatInfo *dfi = &ffi->mDataFormats[0];
 			memset(&fmt, 0, sizeof(fmt));
-			fmt.mFormatID = ffi->mDataFormats[0].mFormatID;
+			fmt.mFormatID = dfi->mFormatID;
+			if (dfi->mNumVariants > 0) {
+				// take the first variant as a default
+				fmt = dfi->mVariants[0];
+				if (dfi->mNumVariants > 1 && dfi->mFormatID == kAudioFormatLinearPCM) {
+					// look for a 16-bit variant as a better default
+					for (int j = 0; j < dfi->mNumVariants; ++j) {
+						AudioStreamBasicDescription *desc = &dfi->mVariants[j];
+						if (desc->mBitsPerChannel == 16) {
+							fmt = *desc;
+							break;
+						}
+					}
+				}
+			}
 			return true;
 		}
 	}
 	return false;
 }
 
+bool	CAAudioFileFormats::InferFileFormatFromFilename(const char *filename, AudioFileTypeID &filetype)
+{
+	if (filename == NULL) return false;
+	
+	const char *inExt = strrchr(filename, '.');
+	if (inExt == NULL) return false;
+	++inExt;	// skip '.'
+
+	for (int i = 0; i < mNumFileFormats; ++i) {
+		FileFormatInfo *ffi = &mFileFormats[i];
+		int next = ffi->NumberOfExtensions();
+		for (int j = 0; j < next; ++j) {
+			char ext[32];
+			ffi->GetExtension(j, ext, sizeof(ext));
+			if (!strcmp(inExt, ext)) {
+				filetype = ffi->mFileTypeID;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 bool	CAAudioFileFormats::InferFileFormatFromDataFormat(const CAStreamBasicDescription &fmt, 
-			OSType &filetype)
+			AudioFileTypeID &filetype)
 {
 	// if there's exactly one file format that supports this data format
 	FileFormatInfo *theFileFormat = NULL;

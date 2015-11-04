@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -43,7 +43,11 @@
 #ifndef __CAAudioFileFormats_h__
 #define __CAAudioFileFormats_h__
 
-#include <AudioToolbox/AudioToolbox.h>
+#if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
+	#include <AudioToolbox/AudioToolbox.h>
+#else
+	#include <AudioToolbox.h>
+#endif
 #include "CAStreamBasicDescription.h"
 
 class CAAudioFileFormats {
@@ -74,7 +78,7 @@ public:
 				CFRelease(mExtensions);
 		}
 		
-		UInt32							mFileTypeID;
+		AudioFileTypeID					mFileTypeID;
 		CFStringRef						mFileTypeName;
 		CFArrayRef						mExtensions;
 		int								mNumDataFormats;
@@ -98,9 +102,11 @@ private:	// use Instance()
 	~CAAudioFileFormats();
 public:
 	
-	bool	InferDataFormatFromFileFormat(UInt32 filetype, CAStreamBasicDescription &fmt);
+	bool	InferDataFormatFromFileFormat(AudioFileTypeID filetype, CAStreamBasicDescription &fmt);
 	
-	bool	InferFileFormatFromDataFormat(const CAStreamBasicDescription &fmt, UInt32 &filetype);
+	bool	InferFileFormatFromFilename(const char *filename, AudioFileTypeID &filetype);
+
+	bool	InferFileFormatFromDataFormat(const CAStreamBasicDescription &fmt, AudioFileTypeID &filetype);
 
 	bool	IsKnownDataFormat(UInt32 dataFormat);
 	
@@ -119,10 +125,6 @@ private:
 	static CAAudioFileFormats *	sInstance;
 };
 
-// utilities to convert OSType's to and from printable strings
-// $$$ move these
-
-// buffer should be at least 17 bytes
 char *	OSTypeToStr(char *buf, UInt32 t);
 int		StrToOSType(const char *str, UInt32 &t);
 

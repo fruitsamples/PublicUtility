@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -49,7 +49,6 @@
 
 //	PublicUtility Includes
 #include "CADebugMacros.h"
-#include "CASharedLibrary.h"
 
 //==================================================================================================
 //	CACFPreferences
@@ -250,21 +249,7 @@ void	CACFPreferences::MarkPrefsClean(bool inCurrentUser, bool inCurrentHost)
 
 void	CACFPreferences::SendNotification(CFStringRef inName)
 {
-	typedef void (*CFNotificationCenterPostNotificationWithOptionsProc)(CFNotificationCenterRef center, CFStringRef name, const void *object, CFDictionaryRef userInfo, CFOptionFlags options);
-
-	static CFNotificationCenterPostNotificationWithOptionsProc sWithOptionsProc = (CFNotificationCenterPostNotificationWithOptionsProc)-1;
-	if(sWithOptionsProc == ((CFNotificationCenterPostNotificationWithOptionsProc)-1))
-	{
-		sWithOptionsProc = (CFNotificationCenterPostNotificationWithOptionsProc)CASharedLibrary::LoadLibraryAndGetRoutineAddress("_CFNotificationCenterPostNotificationWithOptions", "CoreFoundation", "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation");
-	}
-	if(sWithOptionsProc != NULL)
-	{
-		sWithOptionsProc(CFNotificationCenterGetDistributedCenter(), inName, NULL, NULL, 3 /* kCFNotificationDeliverImmediately + kCFNotificationPostToAllSessions*/);
-	}
-	else
-	{
-		CFNotificationCenterPostNotification(CFNotificationCenterGetDistributedCenter(), inName, NULL, NULL, true);
-	}
+	CFNotificationCenterPostNotificationWithOptions(CFNotificationCenterGetDistributedCenter(), inName, NULL, NULL, kCFNotificationDeliverImmediately + kCFNotificationPostToAllSessions);
 }
 
 bool	CACFPreferences::ArePrefsOutOfDate(bool inCurrentUser, bool inCurrentHost)

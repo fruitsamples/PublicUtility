@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -44,36 +44,24 @@
 
 // ____________________________________________________________________________
 
-void	CAAudioFileReader::FileReadBuffer::SetEmpty()
+void	CAAudioFileReader::FileReadBuffer::UpdateAfterRead(SInt64 curFrame, UInt32 nFrames)
 {
-	mStartFrame = mEndFrame = 0;
-	mStartPacket = mEndPacket = -1;
-}
-
-void	CAAudioFileReader::FileReadBuffer::UpdateAfterRead(SInt64 startPacket, SInt64 endPacket, UInt32 nFrames)
-{
-	if (nFrames > 0) {
-		mStartPacket = startPacket;
-		mEndPacket = endPacket;
-	}
 	//printf("read %ld PCM packets, file packets %qd-%qd\n", nPackets, b->mStartPacket, b->mEndPacket);
 	mEndFrame = nFrames;
 	mEndOfStream = (nFrames == 0);
+	mBufferStartFileFrame = curFrame;
 }
 
 // ____________________________________________________________________________
 
-void	CAAudioFileReader::SetFile(AudioFileID fileID)
+void	CAAudioFileReader::SetFile(const FSRef &inFile)
 {
-	if (mFile != NULL && fileID == mFile->GetAudioFileID())
-		return;
-	
 	Stop();
 	CancelAndDisposeBuffers();
 	
 	delete mFile;   mFile = NULL;
 	mFile = new CAAudioFile;
-	mFile->Wrap(fileID, false);
+	mFile->Open(inFile);
 	
 	const CAStreamBasicDescription &fileFmt = mFile->GetFileDataFormat();
 	CAStreamBasicDescription iofmt;
@@ -103,41 +91,57 @@ void	CAAudioFileReader::ReadBuffer(FileReadBuffer *b)
 	CABufferList *ioMemory = b->GetBufferList();
 	CABufferList *fileBuffers = GetBufferList();
 	fileBuffers->SetFrom(ioMemory);
-	UInt32 nPackets = GetBufferSizeFrames();
-	SInt64 curPacket = mFile->TellPacket();
-	mFile->ReadPackets(nPackets, &fileBuffers->GetModifiableBufferList());
-	b->UpdateAfterRead(curPacket, mFile->TellPacket(), nPackets);
+	UInt32 nFrames = GetBufferSizeFrames();
+	SInt64 curFrame = mFile->Tell();
+	mFile->Read(nFrames, &fileBuffers->GetModifiableBufferList());
+	b->UpdateAfterRead(curFrame, nFrames);
 }
 
 double		CAAudioFileReader::GetCurrentPosition() const
 {
-	double nPacketsPlus1 = double(GetNumberPackets() + 1);	// +1 to account for leftovers from decoder
+	return double(GetCurrentFrame()) / double(GetNumberFrames());
+#if 0
+	double nFrames = double(GetNumberFrames());	// +1 to account for leftovers from decoder
 	if (!mRunning)
-		return double(GetCurrentPacket()) / nPacketsPlus1;
-	
+		return double(GetCurrentFrame()) / nFrames;
+
 	if (mEndOfStream) {
 		//printf("EOF\n");
 		return 1.0;
 	}
+
 	const FileReadBuffer *b = static_cast<const FileReadBuffer *>(GetCurrentBuffer());
 		// the buffer from which we're reading
-	SInt64 startPacket, endPacket;
 	UInt32 startFrame, endFrame;
-	b->GetLocation(startPacket, endPacket, startFrame, endFrame);
-	if (startPacket < 0) {
-		//printf("current buffer start packet is -1\n");
-		return 0.;
-	}
-	double packetIndex = double(startPacket);
-	if (endFrame > 0) {
-		double frac = (double(startFrame) / double(endFrame)) * double(endPacket - startPacket);
-		packetIndex += frac;
+	b->GetLocation(startFrame, endFrame);
+	//printf("%qd + %ld / %.f\n", b->mBufferStartFileFrame, startFrame, nFrames);
+	return double(b->mBufferStartFileFrame + startFrame) / nFrames;
+	//if (endFrame > 0) {
+		//double frac = (double(startFrame) / double(endFrame)) * double(endPacket - startPacket);
+		//packetIndex += frac;
 		//printf("frames %ld-%ld, packets %qd-%qd, frac %.3f\n",
 		//	startFrame, endFrame, startPacket, endPacket, frac);
-	}
-	double pos = packetIndex / nPacketsPlus1;
+	//}
+	//double pos = packetIndex / nPacketsPlus1;
 	//printf("%.3f / %.0f = %.3f\n", packetIndex, nPacketsPlus1, pos);
-	return pos;
+	//return pos;
+
+	//return double(GetCurrentFrame()) / nFrames;
+#endif
+}
+
+SInt64	CAAudioFileReader::GetCurrentFrame() const
+{
+	if (!mRunning)
+		return mFile->Tell();
+	if (mEndOfStream)
+		return GetNumberFrames();
+	const FileReadBuffer *b = static_cast<const FileReadBuffer *>(GetCurrentBuffer());
+		// the buffer from which we're reading
+	UInt32 startFrame, endFrame;
+	b->GetLocation(startFrame, endFrame);
+	//printf("%qd + %ld / %.f\n", b->mBufferStartFileFrame, startFrame, nFrames);
+	return b->mBufferStartFileFrame + startFrame;
 }
 
 void	CAAudioFileReader::SetCurrentPosition(double loc)
@@ -145,9 +149,9 @@ void	CAAudioFileReader::SetCurrentPosition(double loc)
 	bool wasRunning = IsRunning();
 	if (wasRunning)
 		Stop();
-	SInt64 packetNumber = SInt64(loc * GetFile().GetNumberPackets() + 0.5);
+	SInt64 frameNumber = SInt64(loc * GetFile().GetNumberFrames() + 0.5);
 	try {
-		GetFile().SeekToPacket(packetNumber);
+		GetFile().Seek(frameNumber);
 	}
 	catch (...) {
 	
@@ -158,7 +162,7 @@ void	CAAudioFileReader::SetCurrentPosition(double loc)
 
 // ____________________________________________________________________________
 
-void	CAAudioFileWriter::SetFile(AudioFileID fileID, Float64 ioSampleRate)
+void	CAAudioFileWriter::SetFile(AudioFileID fileID)
 {
 	Stop();
 	CancelAndDisposeBuffers();
@@ -170,27 +174,26 @@ void	CAAudioFileWriter::SetFile(AudioFileID fileID, Float64 ioSampleRate)
 	const CAStreamBasicDescription &fileFmt = mFile->GetFileDataFormat();
 	CAStreamBasicDescription iofmt;
 	iofmt.SetCanonical(fileFmt.mChannelsPerFrame, false);	// deinterleaved
-	iofmt.mSampleRate = ioSampleRate;
+	iofmt.mSampleRate = fileFmt.mSampleRate;
 	mFile->SetClientFormat(iofmt, NULL);
 	
 	SetFormat(iofmt);
 }
 
-void	CAAudioFileWriter::SetFile(const char *recordFilePath, AudioFileTypeID filetype, const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout, Float64 ioSampleRate)
+void	CAAudioFileWriter::SetFile(const FSRef &parentDir, CFStringRef filename, AudioFileTypeID filetype, const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout)
 {
 	Stop();
 	CancelAndDisposeBuffers();
 	
 	delete mFile;   mFile = NULL;
 	mFile = new CAAudioFile;
-	mFile->PrepareNew(dataFormat, layout);
+	mFile->CreateNew(parentDir, filename, filetype, dataFormat, layout ? &layout->Layout() : NULL);
 	
 	const CAStreamBasicDescription &fileFmt = mFile->GetFileDataFormat();
 	CAStreamBasicDescription iofmt;
 	iofmt.SetCanonical(fileFmt.mChannelsPerFrame, false);	// deinterleaved
-	iofmt.mSampleRate = ioSampleRate;
+	iofmt.mSampleRate = fileFmt.mSampleRate;
 	mFile->SetClientFormat(iofmt, NULL);
-	mFile->Create(recordFilePath, filetype);
 	
 	SetFormat(iofmt);
 }
@@ -211,8 +214,8 @@ void	CAAudioFileWriter::WriteBuffer(CABufferQueue::Buffer *b)
 {
 	CABufferList *ioMemory = b->GetBufferList();
 	CABufferList *fileBuffers = GetBufferList();
-	UInt32 nPackets = b->FrameCount();
-	fileBuffers->SetFrom(ioMemory, GetBytesPerFrame() * nPackets);
-	mFile->WritePackets(nPackets, &fileBuffers->GetModifiableBufferList());
+	UInt32 nFrames = b->FrameCount();
+	fileBuffers->SetFrom(ioMemory, GetBytesPerFrame() * nFrames);
+	mFile->Write(nFrames, &fileBuffers->GetModifiableBufferList());
 	b->SetEmpty();
 }

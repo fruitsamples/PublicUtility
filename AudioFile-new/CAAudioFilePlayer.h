@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -43,13 +43,17 @@
 #ifndef __CAAudioFilePlayer_h__
 #define __CAAudioFilePlayer_h__
 
-#include <AudioUnit/AudioUnit.h>
+#if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
+	#include <AudioUnit/AudioUnit.h>
+#else
+	#include <AudioUnit.h>
+#endif
 #include "CAAudioFileStreamer.h"
 
 // Simple player -- owns an output unit
 class CAAudioFilePlayer : public CAAudioFileReader {
 public:
-	CAAudioFilePlayer(int nBuffers, UInt32 ioBufferSizeBytes);
+	CAAudioFilePlayer(int nBuffers, UInt32 bufferSizeFrames);
 	virtual ~CAAudioFilePlayer();
 
 	// $$$ to add: change device, HAL I/O buffer size
@@ -58,7 +62,7 @@ public:
 	virtual void	Stop();
 	void			SetVolume(double volume);		// 0-1
 	
-	void			SetFile(AudioFileID fileID);
+	void			SetFile(const FSRef &inFile);
 
 protected:
 	// our virtual methods:
@@ -66,7 +70,7 @@ protected:
 	
 	AudioUnit		GetOutputUnit() { return mOutputUnit; }
 
-private:
+protected:
 	static OSStatus	InputProc(
 							void *						inRefCon,
 							AudioUnitRenderActionFlags *ioActionFlags,

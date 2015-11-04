@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -225,7 +225,9 @@ void		CAFileHandling::Scan (const FSRef &inParentDir, CFTreeRef inParentTree)
 {		
 	OSStatus result;
 	FSIterator iter;
-
+	LSItemInfoRecord info;
+	bool fileIsBundle;
+	
 	if (FSOpenIterator (&inParentDir, kFSIterateFlat, &iter))
 		return;
 
@@ -243,16 +245,25 @@ void		CAFileHandling::Scan (const FSRef &inParentDir, CFTreeRef inParentTree)
 			if (catalogInfo.nodeFlags & kFSNodeIsDirectoryMask)
 			{
 				// WE FOUND A SUB DIRECTORY
-				CFTreeRef newSubTree = AddFileItemToTree (theFSRef, inParentTree);
-#if 0
-				printf ("\n* * * ADDING DIR * * *\n");
-				CFShow (newSubTree);
-#endif
-				Scan (theFSRef, newSubTree);
+				// only add it to the tree if it's NOT a package directory
+				result = LSCopyItemInfoForRef( &theFSRef, kLSRequestBasicFlagsOnly, &info );
+				fileIsBundle = false;
+				if (	(result == noErr) &&
+						((kLSItemInfoIsPackage & info.flags) != 0) )
+					fileIsBundle = true;
+				
+				if (!fileIsBundle) {
+					CFTreeRef newSubTree = AddFileItemToTree (theFSRef, inParentTree);
+	#if 0
+					printf ("\n* * * ADDING DIR * * *\n");
+					CFShow (newSubTree);
+	#endif
+					Scan (theFSRef, newSubTree);
+				}
 			}
 			else
 			{
-				//WE FOUND A FILE
+				// WE FOUND A FILE
 				CFURLRef fileURL = CFURLCreateFromFSRef (kCFAllocatorDefault, &theFSRef);
 				CFStringRef fNameExt = CFURLCopyPathExtension (fileURL);
 				bool matches = false;
@@ -537,6 +548,7 @@ OSStatus		CAFileHandling::GetNameCopy (CFTreeRef inTree, CFStringRef &outName) c
     CFTreeGetContext (inTree, &context);
     
     CFURLRef url = (CFURLRef)context.info;
+    if (!url) return paramErr;
     if (CFURLHasDirectoryPath (url)) {
         outName = CFURLCopyLastPathComponent (url);
         return noErr;

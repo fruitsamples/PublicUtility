@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -117,11 +117,15 @@ CAAudioFileRecorder::~CAAudioFileRecorder()
 	delete mAudioInputPtrs;
 }
 
-void	CAAudioFileRecorder::SetFile(const char *recordFilePath, AudioFileTypeID filetype, const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout)
+void	CAAudioFileRecorder::SetFile(const FSRef &parentFSRef, CFStringRef filename, AudioFileTypeID filetype, const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout)
 {
 	delete mAudioInputPtrs; mAudioInputPtrs = NULL;
 	
-	CAAudioFileWriter::SetFile(recordFilePath, filetype, dataFormat, layout, mInputDataFormat.mSampleRate);
+	CAStreamBasicDescription fileDataFormat = dataFormat;
+	if (fileDataFormat.mSampleRate == 0.)
+		fileDataFormat.mSampleRate = mInputDataFormat.mSampleRate;
+	
+	CAAudioFileWriter::SetFile(parentFSRef, filename, filetype, fileDataFormat, layout);
 
 	const CAStreamBasicDescription &fmt = GetFile().GetClientDataFormat();
 	XThrowIfError(AudioUnitSetProperty(
@@ -132,11 +136,12 @@ void	CAAudioFileRecorder::SetFile(const char *recordFilePath, AudioFileTypeID fi
 							(void *)&fmt,
 							sizeof(AudioStreamBasicDescription)), "set audio input format");
 
-	GetFile().SetIOBufferSize(GetBufferSizeFrames() * fmt.mBytesPerFrame);
+	GetFile().SetIOBufferSizeBytes(GetBufferSizeFrames() * fmt.mBytesPerFrame);
 
 	mAudioInputPtrs = CABufferList::New("audio input ptrs", fmt);
 }
 
+/*
 void	CAAudioFileRecorder::SetFile(AudioFileID fileID)
 {
 	delete mAudioInputPtrs; mAudioInputPtrs = NULL;
@@ -156,6 +161,7 @@ void	CAAudioFileRecorder::SetFile(AudioFileID fileID)
 
 	mAudioInputPtrs = CABufferList::New("audio input ptrs", fmt);
 }
+*/
 	
 void	CAAudioFileRecorder::Start()
 {
@@ -180,8 +186,9 @@ OSStatus	CAAudioFileRecorder::InputProc(
 	CAAudioFileRecorder *This = static_cast<CAAudioFileRecorder *>(inRefCon);
 	AudioUnitRenderActionFlags flags = 0;
 	AudioBufferList *abl = &This->mAudioInputPtrs->GetModifiableBufferList();
+	for (UInt32 i = 0; i < abl->mNumberBuffers; ++i)
+		abl->mBuffers[i].mData = NULL;
 	OSStatus err = AudioUnitRender(This->mInputUnit, &flags, inTimeStamp, 1, inNumberFrames, abl);
-	
 	if (err)
 		return err;
 	

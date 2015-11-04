@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -48,7 +48,7 @@
 #include "CAStreamBasicDescription.h"
 #include "CABufferList.h"
 #include <list>
-#include "CAAtomicFIFO.h"
+#include "CAAtomicStack.h"
 
 // ____________________________________________________________________________
 
@@ -88,6 +88,12 @@ public:
 		Buffer *		get_next() { return mNext; }
 		void			set_next(Buffer *b) { mNext = b; }
 		
+#if DEBUG
+		void			print() {
+							printf("Buffer %p:\n  inProgress %d, endOfStream %d, frames %ld-%ld\n", this, mInProgress, mEndOfStream, mStartFrame, mEndFrame);
+						}
+#endif
+		
 	protected:
 		Buffer *		mNext;
 		CABufferQueue * mQueue;
@@ -98,6 +104,20 @@ public:
 		bool			mEndOfStream;				// true if the operation resulted in end-of-stream
 		UInt32			mStartFrame, mEndFrame;		// produce/consume pointers within the buffer
 	};
+	
+#if DEBUG
+	void	print() {
+		printf("BufferQueue %p\n  mCurrentBuffer=%d\n", this, mCurrentBuffer);
+		if (mBuffers)
+		for (int i = 0; i < mNumberBuffers; ++i) {
+			Buffer *b = mBuffers[i];
+			printf("  buffer[%d]: ", i);
+			if (b)
+				b->print();
+			else printf("NULL\n");
+		}
+	}
+#endif
 	
 protected:	
 	virtual Buffer *	CreateBuffer(const CAStreamBasicDescription &fmt, UInt32 nBytes) = 0;
@@ -133,7 +153,7 @@ private:
 		bool			mStopped;
 		WorkQueue		mWorkQueue;
 		CAGuard			mRunGuard;
-		TStack<Buffer>  mBuffersToAdd;
+		TAtomicStack<Buffer>  mBuffersToAdd;
 	};
 	
 	static WorkThread *	sWorkThread;

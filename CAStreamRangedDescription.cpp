@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -51,10 +51,22 @@
 //	CAStreamRangedDescription
 //==================================================================================================
 
-CAStreamRangedDescription::CAStreamRangedDescription()
-{
-}
+const AudioStreamRangedDescription	CAStreamRangedDescription::sEmpty = { { 0.0, 0, 0, 0, 0, 0, 0, 0, 0 }, { 0.0, 0.0 } };
 
-CAStreamRangedDescription::~CAStreamRangedDescription()
+#if CoreAudio_Debug
+#include "CALogMacros.h"
+
+void	CAStreamRangedDescription::PrintToLog(const AudioStreamRangedDescription& inDesc)
 {
+	PrintFloat		("  Sample Rate:        ", inDesc.mFormat.mSampleRate);
+	PrintFloat		("  Max Sample Rate:    ", inDesc.mSampleRateRange.mMaximum);
+	PrintFloat		("  Min Sample Rate:    ", inDesc.mSampleRateRange.mMinimum);
+	Print4CharCode	("  Format ID:          ", inDesc.mFormat.mFormatID);
+	PrintHex		("  Format Flags:       ", inDesc.mFormat.mFormatFlags);
+	PrintInt		("  Bytes per Packet:   ", inDesc.mFormat.mBytesPerPacket);
+	PrintInt		("  Frames per Packet:  ", inDesc.mFormat.mFramesPerPacket);
+	PrintInt		("  Bytes per Frame:    ", inDesc.mFormat.mBytesPerFrame);
+	PrintInt		("  Channels per Frame: ", inDesc.mFormat.mChannelsPerFrame);
+	PrintInt		("  Bits per Channel:   ", inDesc.mFormat.mBitsPerChannel);
 }
+#endif

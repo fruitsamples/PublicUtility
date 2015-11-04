@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -49,7 +49,7 @@
 // Specialization of CAAudioFilePlayer to perform channel remapping or downmixing.
 class CAChannelMappingPlayer : public CAAudioFilePlayer {
 public:
-	CAChannelMappingPlayer(int nBuffers, UInt32 ioBufferSizeBytes);
+	CAChannelMappingPlayer(int nBuffers, UInt32 bufferSizeFrames);
 	~CAChannelMappingPlayer();
 
 	// CAAudioFilePlayer overrides:

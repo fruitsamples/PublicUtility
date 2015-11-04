@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -54,45 +54,20 @@ UInt32	CAHostTimeBase::sFromNanosNumerator = 0;
 UInt32	CAHostTimeBase::sFromNanosDenominator = 0;
 bool	CAHostTimeBase::sUseMicroseconds = false;
 bool	CAHostTimeBase::sIsInited = false;
-#if !TARGET_API_MAC_OSX || Track_Host_TimeBase
+#if Track_Host_TimeBase
 UInt64	CAHostTimeBase::sLastTime = 0;
 #endif
 
 //=============================================================================
 //	CAHostTimeBase
 //
-//	This class provides platform independant access to the host's time base.
+//	This class provides platform independent access to the host's time base.
 //=============================================================================
 
 void	CAHostTimeBase::Initialize()
 {
 	//	get the info about Absolute time
-	#if !TARGET_API_MAC_OSX
-		#if	TARGET_OS_MAC
-			//	first check to see if UpTime is around
-			if(UpTime != NULL)
-			{
-				GetTimeBaseInfo(&sMinDelta, &sToNanosNumerator, &sToNanosDenominator, &sFromNanosNumerator, &sFromNanosDenominator);
-			}
-			else
-			{
-				//	no UpTime, so fall back to Microseconds
-				sUseMicroseconds = true;
-				sMinDelta = 1;
-				sToNanosNumerator = 1000;
-				sToNanosDenominator = 1;
-				sFromNanosNumerator = sToNanosDenominator;
-				sFromNanosDenominator = sToNanosDenominator;
-			}
-		#else
-			sUseMicroseconds = true;
-			sMinDelta = 1;
-			sToNanosNumerator = 1000;
-			sToNanosDenominator = 1;
-			sFromNanosNumerator = sToNanosDenominator;
-			sFromNanosDenominator = sToNanosDenominator;
-		#endif
-	#else
+	#if TARGET_OS_MAC
 		struct mach_timebase_info	theTimeBaseInfo;
 		mach_timebase_info(&theTimeBaseInfo);
 		sMinDelta = 1;
@@ -100,16 +75,26 @@ void	CAHostTimeBase::Initialize()
 		sToNanosDenominator = theTimeBaseInfo.denom;
 		sFromNanosNumerator = sToNanosDenominator;
 		sFromNanosDenominator = sToNanosNumerator;
+
+		//	the frequency of that clock is: (sToNanosDenominator / sToNanosNumerator) * 10^9
+		sFrequency = static_cast<Float64>(sToNanosDenominator) / static_cast<Float64>(sToNanosNumerator);
+		sFrequency *= 1000000000.0;
+	#elif TARGET_OS_WIN32
+		LARGE_INTEGER theFrequency;
+		QueryPerformanceFrequency(&theFrequency);
+		sMinDelta = 1;
+		sToNanosNumerator = 1000000000ULL;
+		sToNanosDenominator = *((UInt64*)&theFrequency);
+		sFromNanosNumerator = sToNanosDenominator;
+		sFromNanosDenominator = sToNanosNumerator;
+		sFrequency = static_cast<Float64>(*((UInt64*)&theFrequency));
 	#endif
 
-	//	the frequency of that clock is: (sToNanosDenominator / sToNanosNumerator) * 10^9
-	sFrequency = static_cast<Float64>(sToNanosDenominator) / static_cast<Float64>(sToNanosNumerator);
-	sFrequency *= 1000000000.0;
 	
 	#if	Log_Host_Time_Base_Parameters
 		DebugMessage(  "Host Time Base Parameters");
 		DebugMessageN1(" Minimum Delta:          %lu", sMinDelta);
-		DebugMessageN1(" Fequency:               %f", sFrequency);
+		DebugMessageN1(" Frequency:              %f", sFrequency);
 		DebugMessageN1(" To Nanos Numerator:     %lu", sToNanosNumerator);
 		DebugMessageN1(" To Nanos Denominator:   %lu", sToNanosDenominator);
 		DebugMessageN1(" From Nanos Numerator:   %lu", sFromNanosNumerator);

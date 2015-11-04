@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -43,17 +43,51 @@
 #include "CAAUParameter.h"
 
 CAAUParameter::CAAUParameter() 
-	: mParamName(NULL),
-	  mParamTag (0),
-	  mNumIndexedParams (0),
-	  mNamedParams (0)
 {
+	memset(this, 0, sizeof(CAAUParameter));
 }
 
 CAAUParameter::CAAUParameter(AudioUnit au, AudioUnitParameterID param, AudioUnitScope scope, AudioUnitElement element)
-	: mParamTag (0),
-	  mNumIndexedParams (0),
-	  mNamedParams (0)
+{
+	memset(this, 0, sizeof(CAAUParameter));
+	Init (au, param, scope, element);
+}
+
+CAAUParameter::CAAUParameter (AudioUnitParameter &inParam)
+{
+	memset(this, 0, sizeof(CAAUParameter));
+	Init (inParam.mAudioUnit, inParam.mParameterID, inParam.mScope, inParam.mElement);
+}
+
+CAAUParameter::CAAUParameter(const CAAUParameter &a) 
+{
+	memset(this, 0, sizeof(CAAUParameter));
+	*this = a;
+}
+
+CAAUParameter &	CAAUParameter::operator = (const CAAUParameter &a)
+{
+	if (mParamName) CFRelease(mParamName);
+	if (mParamTag) CFRelease(mParamTag);
+	if (mNamedParams) CFRelease(mNamedParams);
+	
+	memcpy(this, &a, sizeof(CAAUParameter));
+
+	if (mParamName) CFRetain(mParamName);
+	if (mParamTag) CFRetain(mParamTag);
+	if (mNamedParams) CFRetain(mNamedParams);
+	
+	return *this;
+}
+
+CAAUParameter::~CAAUParameter()
+{
+	if (mParamName) CFRelease(mParamName);
+	if (mParamTag) CFRelease(mParamTag);
+	if (mNamedParams) CFRelease (mNamedParams);
+}
+
+void		CAAUParameter::Init (AudioUnit au, AudioUnitParameterID param, AudioUnitScope scope, AudioUnitElement element)
 {
 	mAudioUnit = au;
 	mParameterID = param;
@@ -133,6 +167,9 @@ CAAUParameter::CAAUParameter(AudioUnit au, AudioUnitParameterID param, AudioUnit
 		case kAudioUnitParameterUnit_Milliseconds:
 			str = "msecs";
 			break;
+		case kAudioUnitParameterUnit_Ratio:
+			str = "ratio";
+			break;
 		case kAudioUnitParameterUnit_Indexed:
 			{
 				propertySize = sizeof(mNamedParams);
@@ -174,41 +211,8 @@ CAAUParameter::CAAUParameter(AudioUnit au, AudioUnitParameterID param, AudioUnit
 		mParamTag = NULL;
 }
 
-CAAUParameter::CAAUParameter(const CAAUParameter &a) :
-	mParamName(NULL),
-	mParamTag (0),
-	mNumIndexedParams (0),
-	mNamedParams (0)
-{
-	*this = a;
-}
 
-CAAUParameter &	CAAUParameter::operator = (const CAAUParameter &a)
-{
-	if (mParamName) CFRelease(mParamName);
-	if (mParamTag) CFRelease(mParamTag);
-	if (mNamedParams) CFRelease(mNamedParams);
-	
-	memcpy(this, &a, sizeof(CAAUParameter));
-
-	if (mParamName) CFRetain(mParamName);
-	if (mParamTag) CFRetain(mParamTag);
-	if (mNamedParams) CFRetain(mNamedParams);
-	
-	return *this;
-}
-
-CAAUParameter::~CAAUParameter()
-{
-	if (mParamName)
-		CFRelease(mParamName);
-	if (mParamTag)
-		CFRelease(mParamTag);
-	if (mNamedParams)
-		CFRelease (mNamedParams);
-}
-
-Float32		CAAUParameter::GetValue()
+Float32		CAAUParameter::GetValue() const
 {
 	Float32 value = 0.;
 	//OSStatus err = 
@@ -216,9 +220,19 @@ Float32		CAAUParameter::GetValue()
 	return value;
 }
 
-CFStringRef CAAUParameter::GetStringFromValueCopy(const Float32 *value) 
+CFStringRef CAAUParameter::GetStringFromValueCopy(const Float32 *value) const
 {
-	if (ValuesHaveStrings()) 
+	if (HasNamedParams())
+	{
+		Float32 val = (value == NULL ? GetValue() : *value);
+		int index = int(mParamInfo.minValue) + int(val);
+		CFStringRef str = GetParamName (index);
+		if (str) {
+			CFRetain (str);
+			return str;
+		}
+	}
+	else if (ValuesHaveStrings()) 
 	{
 		AudioUnitParameterStringFromValue stringValue;
 		stringValue.inParamID = mParameterID;
@@ -239,11 +253,11 @@ CFStringRef CAAUParameter::GetStringFromValueCopy(const Float32 *value)
 	
 	Float32 val = (value == NULL ? GetValue() : *value);
 	char valstr[32];
-	AUParameterFormatValue (val, this, valstr, (HasDisplayTransformation() ? 4 : 3));
+	AUParameterFormatValue (val, this, valstr, 4);
 	return CFStringCreateWithCString(NULL, valstr, kCFStringEncodingUTF8);
 }
 
-Float32 CAAUParameter::GetValueFromString(CFStringRef str)
+Float32 CAAUParameter::GetValueFromString(CFStringRef str) const
 {
 	if (ValuesHaveStrings()) 
 	{
@@ -271,9 +285,9 @@ Float32 CAAUParameter::GetValueFromString(CFStringRef str)
 	return paramValue;
 }
 
-void		CAAUParameter::SetValue(	AUParameterListenerRef			inListener, 
+void		CAAUParameter::SetValue(	AUParameterListenerRef		inListener, 
 									void *							inObject,
-									Float32							inValue)
+									Float32							inValue) const
 {
     // clip inValue as: maxValue >= inValue >= minValue before setting
     Float32 valueToSet = inValue;
@@ -285,4 +299,18 @@ void		CAAUParameter::SetValue(	AUParameterListenerRef			inListener,
 	AUParameterSet(inListener, inObject, this, valueToSet, 0);
 }
 
-
+#if DEBUG
+void	CAAUParameter::Print() const
+{
+	UInt32 clump = 0;
+	GetClumpID (clump);
+	
+	UInt32 len = CFStringGetLength(mParamName);
+	char* chars = (char*)malloc (len * 2); // give us plenty of room for unichar chars
+	if (!CFStringGetCString (mParamName, chars, len * 2, kCFStringEncodingUTF8))
+		chars[0] = 0;
+	
+	printf ("ID: %ld, Clump: %ld, Name: %s\n", mParameterID, clump, chars);
+	free (chars);
+}
+#endif

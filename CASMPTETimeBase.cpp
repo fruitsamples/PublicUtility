@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -57,9 +57,9 @@ enum
 };
 */
 
-static SInt8 gMTCTypes[] = { 0, 1, 2, 3, 3, 2, -1, -1 };
-static double gFramesPerSecond[] = { 24., 25., 29.97, 30., 29.97, 29.97 * .999 /* ????? */, 60., 59.94 };
-static UInt8 gFormatFramesPerSecond[] = { 24, 25, 30, 30, 30, 30, 60, 60 };
+static const SInt8 gMTCTypes[] = { 0, 1, 2, 3, 3, 2, -1, -1 };	// map our constants to MIDI Time Code representations
+static const double gFramesPerSecond[] = { 24., 25., 29.97, 30., 29.97, 29.97 * .999 /* ????? */, 60., 59.94 };
+static const UInt8 gFormatFramesPerSecond[] = { 24, 25, 30, 30, 30, 30, 60, 60 };
 
 bool	CASMPTETimeBase::SetFormat(UInt32	inSMPTEFormat)
 {
@@ -78,11 +78,13 @@ bool	CASMPTETimeBase::SetFormat(UInt32	inSMPTEFormat)
 	http://www.phatnav.com/wiki/wiki.phtml?title=SMPTE_time_code
 
 	To correct this, drop frame SMPTE timecode drops frame numbers 0 and 1 of the first second of every minute, and includes them when the number of minutes is divisible by ten. This almost perfectly compensates for the difference in rate, leaving a residual timing error of roughly 86.4 microseconds per day, an error of only 0.001 ppm. Note: only timecode frame numbers are dropped. Video frames continue in sequence.
+	
+	NOTE: drop frame calculations all assume 30 fps = 1800 frames/minute = 18000 frames/10 minutes
 */
 
-void	CASMPTETimeBase::SecondsToSMPTERep( Float64					inSeconds,
+void	CASMPTETimeBase::SecondsToSMPTETime(Float64					inSeconds,
 											UInt16					inSubframeDivisor,
-											SMPTETime &				outSMPTETime)
+											SMPTETime &				outSMPTETime) const
 {
 	// time in subframes
 	int bitsPerSecond = inSubframeDivisor * mFormatFramesPerSecond;
@@ -95,7 +97,7 @@ void	CASMPTETimeBase::SecondsToSMPTERep( Float64					inSeconds,
 	
 	// if it's drop frame, add back a number of frames to fix up representation
 	if (mIsDropFrame) { // drop frame
-		int bitsPer10Minutes = inSubframeDivisor * 17982;
+		int bitsPer10Minutes = inSubframeDivisor * 17982;	// 18000 - 18 dropped
 		// how many 10-minute periods? count 18 dropped frames for each
 		int minutes10 = (absBits / bitsPer10Minutes);
 		int extraFrames = 18 * minutes10;
@@ -127,8 +129,10 @@ void	CASMPTETimeBase::SecondsToSMPTERep( Float64					inSeconds,
 	outSMPTETime.mType = mFormat;
 }
 
-bool	CASMPTETimeBase::SMPTERepToSeconds( const SMPTETime &		inSMPTETime,
-											Float64 &				outSeconds)
+
+
+bool	CASMPTETimeBase::SMPTETimeToSeconds(const SMPTETime &		inSMPTETime,
+											Float64 &				outSeconds) const
 {
 	if (inSMPTETime.mHours > 23 || inSMPTETime.mMinutes > 59 || inSMPTETime.mSeconds > 59 || inSMPTETime.mFrames >= mFormatFramesPerSecond || inSMPTETime.mSubframes >= inSMPTETime.mSubframeDivisor)
 		return false;
@@ -139,10 +143,10 @@ bool	CASMPTETimeBase::SMPTERepToSeconds( const SMPTETime &		inSMPTETime,
 						(inSMPTETime.mMinutes + 60 *  // minutes
 						 inSMPTETime.mHours))); // hours
 	// now, figure out the number of dropped frames
-	if (mIsDropFrame) { // drop frame
+	if (mIsDropFrame) {
 		frames -= inSMPTETime.mHours * 6 * 18; // hours, 18 frames for each 10 minutes
 		int minutes = inSMPTETime.mMinutes;
-		frames -= (minutes / 10) * 18; // 10-minute periods
+		frames -= (minutes / 10) * 18; // 18 frames per 10-minute period
 		minutes %= 10;
 		if (minutes) {
 			if (inSMPTETime.mFrames < 2)
@@ -157,37 +161,38 @@ bool	CASMPTETimeBase::SMPTERepToSeconds( const SMPTETime &		inSMPTETime,
 
 // increment a 32-bit MTC SMPTE frame representation
 // HHMMSSFF (nibbles)
-UInt32  CASMPTETimeBase::IncrementFrame(UInt32 hmsf)
+SMPTE_HMSF  CASMPTETimeBase::AdvanceFrame(SMPTE_HMSF hmsf, int nToAdvance) const
 {
-	hmsf += 1;
-	if ((hmsf & 0xFF) == UInt32(mFormatFramesPerSecond)) {
-		// next second
-		hmsf &= ~0xFF;
-		hmsf += 0x100;
-		if ((hmsf & 0xFF00) == (60 << 8)) {
-			// 60 seconds
-			hmsf &= ~0xFF00;
-			hmsf += 0x10000;
-			if ((hmsf & 0xFF0000) == (60 << 16)) {
-				// 60 minutes
-				hmsf &= ~0xFF0000;
-				hmsf += 0x1000000;
-				if ((hmsf & 0x1F000000) == (24 << 24))
-					// 24 hours
-					hmsf &= ~0x1F000000;
+	while (--nToAdvance >= 0) {
+		hmsf += 1;
+		if ((hmsf & 0xFF) == UInt32(mFormatFramesPerSecond)) {
+			// next second
+			hmsf &= ~0xFF;
+			hmsf += 0x100;
+			if ((hmsf & 0xFF00) == (60 << 8)) {
+				// 60 seconds
+				hmsf &= ~0xFF00;
+				hmsf += 0x10000;
+				if ((hmsf & 0xFF0000) == (60 << 16)) {
+					// 60 minutes
+					hmsf &= ~0xFF0000;
+					hmsf += 0x1000000;
+					if ((hmsf & 0x1F000000) == (24 << 24))
+						// 24 hours
+						hmsf &= ~0x1F000000;
+				}
 			}
 		}
+		if (mIsDropFrame &&
+				(hmsf & 0xFFFE) == 0 && 	// either of first two frames of first second
+				((hmsf & 0x00FF0000) >> 16) % 10 != 0)	// not the first of a 10-minute period
+			hmsf += 2; // drop the two frames
 	}
-	if (mIsDropFrame &&
-			(hmsf & 0xFFFE) == 0 && 	// either of first two frames of first second
-			((hmsf & 0x00FF0000) >> 16) % 10 != 0)	// not the first of a 10-minute period
-		hmsf += 2; // drop the two frames
 	return hmsf;
 }
 
-
 // convert SMPTE representation as four bytes in a UInt32 to number of frames since 0
-UInt32  CASMPTETimeBase::ParseFrame(UInt32 hmsf)
+UInt32	CASMPTETimeBase::HMSFToAbsoluteFrame(SMPTE_HMSF hmsf) const
 {
 	// first, compute it assuming no dropped frames
 	UInt32 frames = (hmsf & 0xFF) + mFormatFramesPerSecond * ( // frames

@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -62,11 +62,11 @@ public:
 		MIDIUniqueID		mUniqueID;			// may refer to a driver or external endpoint.
 												// use this as your permanent reference to it.
 		
-		EndpointInfo() :
+		EndpointInfo(MIDIUniqueID uid=kMIDIInvalidUniqueID) :
 			mSourceEndpoint(NULL),
 			mDestinationEndpoint(NULL),
 			mDisplayName(NULL),
-			mUniqueID(kMIDIInvalidUniqueID) { }
+			mUniqueID(uid) { }
 		
 		EndpointInfo(const EndpointInfo &info) : mDisplayName(NULL) { *this = info; }
 

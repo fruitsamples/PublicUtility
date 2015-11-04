@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -49,7 +49,7 @@
 //  Super Class Includes
 #include <CoreAudio/AudioHardware.h>
 
-//	PublicUtility Includes
+//  PublicUtility Includes
 #include "CAAudioValueRange.h"
 #include "CAStreamBasicDescription.h"
 
@@ -62,11 +62,33 @@ class CAStreamRangedDescription
 	public AudioStreamRangedDescription
 {
 
+//	Constants
+public:
+	static const AudioStreamRangedDescription	sEmpty;
+
 //	Construction/Destruction
 public:
-					CAStreamRangedDescription() { memset(&mFormat, 0, sizeof(AudioStreamBasicDescription) + sizeof(AudioValueRange)); }
-					CAStreamRangedDescription(const AudioStreamBasicDescription& inFormat, const AudioValueRange& inSampleRateRange) { mFormat = inFormat; mSampleRateRange = inSampleRateRange; return *this; }
+								CAStreamRangedDescription()																							{ memset(this, 0, sizeof(AudioStreamRangedDescription)); }
+								CAStreamRangedDescription(const CAStreamRangedDescription& inFormat)												{ mFormat = inFormat.mFormat; mSampleRateRange = inFormat.mSampleRateRange; }
+								CAStreamRangedDescription(const AudioStreamRangedDescription& inFormat)												{ mFormat = inFormat.mFormat; mSampleRateRange = inFormat.mSampleRateRange; }
+								CAStreamRangedDescription(const AudioStreamBasicDescription& inFormat)												{ mFormat = inFormat; mSampleRateRange.mMinimum = inFormat.mSampleRate; mSampleRateRange.mMaximum = inFormat.mSampleRate; }
+								CAStreamRangedDescription(const AudioStreamBasicDescription& inFormat, const AudioValueRange& inSampleRateRange)	{ mFormat = inFormat; mSampleRateRange = inSampleRateRange; }
+	CAStreamRangedDescription&  operator=(const CAStreamRangedDescription& inFormat)																{ mFormat = inFormat.mFormat; mSampleRateRange = inFormat.mSampleRateRange; return *this; }
+	CAStreamRangedDescription&  operator=(const AudioStreamRangedDescription& inFormat)																{ mFormat = inFormat.mFormat; mSampleRateRange = inFormat.mSampleRateRange; return *this; }
 
+	static bool					IsMixable(const AudioStreamRangedDescription& inDescription) { return (inDescription.mFormat.mFormatID == kAudioFormatLinearPCM) && ((inDescription.mFormat.mFormatFlags & kIsNonMixableFlag) == 0); }
+#if CoreAudio_Debug
+	static void					PrintToLog(const AudioStreamRangedDescription& inDesc);
+#endif
 };
+
+inline bool operator<(const AudioStreamRangedDescription& x, const AudioStreamRangedDescription& y)													{ return (x.mFormat < y.mFormat) && (x.mSampleRateRange < y.mSampleRateRange); }
+inline bool operator==(const AudioStreamRangedDescription& x, const AudioStreamRangedDescription& y)												{ return (x.mFormat == y.mFormat) && (x.mSampleRateRange == y.mSampleRateRange); }
+#if TARGET_OS_MAC || (TARGET_OS_WIN32 && (_MSC_VER > 600))
+inline bool	operator!=(const AudioStreamRangedDescription& x, const AudioStreamRangedDescription& y)												{ return !(x == y); }
+inline bool	operator<=(const AudioStreamRangedDescription& x, const AudioStreamRangedDescription& y)												{ return (x < y) || (x == y); }
+inline bool	operator>=(const AudioStreamRangedDescription& x, const AudioStreamRangedDescription& y)												{ return !(x < y); }
+inline bool	operator>(const AudioStreamRangedDescription& x, const AudioStreamRangedDescription& y)													{ return !((x < y) || (x == y)); }
+#endif
 
 #endif

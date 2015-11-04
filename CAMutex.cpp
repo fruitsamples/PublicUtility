@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -35,77 +35,163 @@
 			(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
 			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
+/*==================================================================================================
 	CAMutex.cpp
 	
-=============================================================================*/
+	
+	Revision 1.7  2004/10/28 01:11:58  dwyatt
+	[a radar for each of our projects] CAMutex.cpp (not .h) requires errno.h
+	
+	Revision 1.6  2004/09/29 00:59:10  jcm10
+	use the right test in Lock()
+	
+	Revision 1.5  2004/09/04 21:20:46  dwyatt
+	add Log_LongLatencies
+	
+	Revision 1.4  2004/09/02 00:01:49  dwyatt
+	optimize Lock() and Try() to call pthread_self once instead of twice
+	
+	Revision 1.3  2004/08/26 08:13:33  jcm10
+	finish bring up on Windows
+	
+	Revision 1.2  2004/03/13 02:27:38  jcm10
+	enable the new Try code
+	
+	Revision 1.1  2003/12/17 20:56:59  dwyatt
+	new base class for CAGuard
+	
+	created Wed Dec 17 2003, Doug Wyatt
+	Copyright (c) 2003 Apple Computer, Inc.  All Rights Reserved
 
-//=============================================================================
+	$NoKeywords: $
+==================================================================================================*/
+
+//==================================================================================================
 //	Includes
-//=============================================================================
+//==================================================================================================
 
+//	Self Include
 #include "CAMutex.h"
+
+#if TARGET_OS_MAC
+	#include <errno.h>
+#endif
+
+//	PublicUtility Includes
 #include "CADebugMacros.h"
 #include "CAException.h"
 #include "CAHostTimeBase.h"
 
+//==================================================================================================
+//	Logging
+//==================================================================================================
+
 #if CoreAudio_Debug
 //	#define	Log_Ownership		1
 //	#define	Log_Errors			1
+//	#define Log_LongLatencies	1
+//	#define LongLatencyThreshholdNS	1000000ULL	// nanoseconds
 #endif
 
-//=============================================================================
+//==================================================================================================
 //	CAMutex
-//=============================================================================
+//==================================================================================================
 
 CAMutex::CAMutex(const char* inName)
 :
 	mName(inName),
 	mOwner(0)
 {
+#if TARGET_OS_MAC
 	OSStatus theError = pthread_mutex_init(&mMutex, NULL);
 	ThrowIf(theError != 0, CAException(theError), "CAMutex::CAMutex: Could not init the mutex");
-	
-	mOwner = 0;
 	
 	#if	Log_Ownership
 		DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::CAMutex: creating %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), mName, mOwner);
 	#endif
+#elif TARGET_OS_WIN32
+	mMutex = CreateMutex(NULL, false, NULL);
+	ThrowIfNULL(mMutex, CAException(GetLastError()), "CAMutex::CAMutex: could not create the mutex.");
+	
+	#if	Log_Ownership
+		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::CAMutex: creating %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), mName, mOwner);
+	#endif
+#endif
 }
 
 CAMutex::~CAMutex()
 {
+#if TARGET_OS_MAC
 	#if	Log_Ownership
 		DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::~CAMutex: destroying %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), mName, mOwner);
 	#endif
 	pthread_mutex_destroy(&mMutex);
+#elif TARGET_OS_WIN32
+	#if	Log_Ownership
+		DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::~CAMutex: destroying %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), mName, mOwner);
+	#endif
+	if(mMutex != NULL)
+	{
+		CloseHandle(mMutex);
+	}
+#endif
 }
 
 bool	CAMutex::Lock()
 {
 	bool theAnswer = false;
 	
-	if(!pthread_equal(pthread_self(), mOwner))
+#if TARGET_OS_MAC
+	pthread_t theCurrentThread = pthread_self();
+	if(!pthread_equal(theCurrentThread, mOwner))
 	{
 		#if	Log_Ownership
-			DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Lock: thread %p is locking %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
+			DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Lock: thread %p is locking %s, owner: %p\n", theCurrentThread, ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), theCurrentThread, mName, mOwner);
 		#endif
-
+		
+		#if Log_LongLatencies
+			UInt64 lockTryTime = CAHostTimeBase::GetCurrentTimeInNanos();
+		#endif
+		
 		OSStatus theError = pthread_mutex_lock(&mMutex);
 		ThrowIf(theError != 0, CAException(theError), "CAMutex::Lock: Could not lock the mutex");
-		mOwner = pthread_self();
+		mOwner = theCurrentThread;
 		theAnswer = true;
 	
+		#if Log_LongLatencies
+			UInt64 lockAcquireTime = CAHostTimeBase::GetCurrentTimeInNanos();
+			if (lockAcquireTime - lockTryTime >= LongLatencyThresholdNS)
+				DebugPrintfRtn(DebugPrintfFile, "Thread %p took %.6fs to acquire the lock %s\n", theCurrentThread, (lockAcquireTime - lockTryTime) * 1.0e-9 /* nanos to seconds */, mName);
+		#endif
+		
 		#if	Log_Ownership
 			DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Lock: thread %p has locked %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
 		#endif
 	}
+#elif TARGET_OS_WIN32
+	if(mOwner != GetCurrentThreadId())
+	{
+		#if	Log_Ownership
+			DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::Lock: thread %lu is locking %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+		#endif
+
+		OSStatus theError = WaitForSingleObject(mMutex, INFINITE);
+		ThrowIfError(theError, CAException(theError), "CAMutex::Lock: could not lock the mutex");
+		mOwner = GetCurrentThreadId();
+		theAnswer = true;
+	
+		#if	Log_Ownership
+			DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::Lock: thread %lu has locked %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+		#endif
+	}
+#endif
 
 	return theAnswer;
 }
 
 void	CAMutex::Unlock()
 {
+#if TARGET_OS_MAC
 	if(pthread_equal(pthread_self(), mOwner))
 	{
 		#if	Log_Ownership
@@ -124,6 +210,26 @@ void	CAMutex::Unlock()
 	{
 		DebugMessage("CAMutex::Unlock: A thread is attempting to unlock a Mutex it doesn't own");
 	}
+#elif TARGET_OS_WIN32
+	if(mOwner == GetCurrentThreadId())
+	{
+		#if	Log_Ownership
+			DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::Unlock: thread %lu is unlocking %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+		#endif
+
+		mOwner = 0;
+		bool wasReleased = ReleaseMutex(mMutex);
+		ThrowIf(!wasReleased, CAException(GetLastError()), "CAMutex::Unlock: Could not unlock the mutex");
+	
+		#if	Log_Ownership
+			DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::Unlock: thread %lu has unlocked %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+		#endif
+	}
+	else
+	{
+		DebugMessage("CAMutex::Unlock: A thread is attempting to unlock a Mutex it doesn't own");
+	}
+#endif
 }
 
 bool	CAMutex::Try(bool& outWasLocked)
@@ -131,11 +237,13 @@ bool	CAMutex::Try(bool& outWasLocked)
 	bool theAnswer = false;
 	outWasLocked = false;
 
-	if(!pthread_equal(pthread_self(), mOwner))
+#if TARGET_OS_MAC
+	pthread_t theCurrentThread = pthread_self();
+	if(!pthread_equal(theCurrentThread, mOwner))
 	{
 		//	this means the current thread doesn't already own the lock
 		#if	Log_Ownership
-			DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Try: thread %p is try-locking %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
+			DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Try: thread %p is try-locking %s, owner: %p\n", theCurrentThread, ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), theCurrentThread, mName, mOwner);
 		#endif
 
 		//	go ahead and call trylock to see if we can lock it.
@@ -143,12 +251,12 @@ bool	CAMutex::Try(bool& outWasLocked)
 		if(theError == 0)
 		{
 			//	return value of 0 means we successfully locked the lock
-			mOwner = pthread_self();
+			mOwner = theCurrentThread;
 			theAnswer = true;
 			outWasLocked = true;
 	
 			#if	Log_Ownership
-				DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Try: thread %p has locked %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
+				DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Try: thread %p has locked %s, owner: %p\n", theCurrentThread, ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), theCurrentThread, mName, mOwner);
 			#endif
 		}
 		else if(theError == EBUSY)
@@ -158,7 +266,7 @@ bool	CAMutex::Try(bool& outWasLocked)
 			outWasLocked = false;
 	
 			#if	Log_Ownership
-				DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Try: thread %p failed to lock %s, owner: %p\n", pthread_self(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), pthread_self(), mName, mOwner);
+				DebugPrintfRtn(DebugPrintfFile, "%p %.4f: CAMutex::Try: thread %p failed to lock %s, owner: %p\n", theCurrentThread, ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), theCurrentThread, mName, mOwner);
 			#endif
 		}
 		else
@@ -173,8 +281,68 @@ bool	CAMutex::Try(bool& outWasLocked)
 		theAnswer = true;
 		outWasLocked = false;
 	}
+#elif TARGET_OS_WIN32
+	if(mOwner != GetCurrentThreadId())
+	{
+		//	this means the current thread doesn't own the lock
+		#if	Log_Ownership
+			DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::Try: thread %lu is try-locking %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+		#endif
+		
+		//	try to acquire the mutex
+		OSStatus theError = WaitForSingleObject(mMutex, 0);
+		if(theError == WAIT_OBJECT_0)
+		{
+			//	this means we successfully locked the lock
+			mOwner = GetCurrentThreadId();
+			theAnswer = true;
+			outWasLocked = true;
+	
+			#if	Log_Ownership
+				DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::Try: thread %lu has locked %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+			#endif
+		}
+		else if(theError == WAIT_TIMEOUT)
+		{
+			//	this means that the lock was already locked by another thread
+			theAnswer = false;
+			outWasLocked = false;
+	
+			#if	Log_Ownership
+				DebugPrintfRtn(DebugPrintfFile, "%lu %.4f: CAMutex::Try: thread %lu failed to lock %s, owner: %lu\n", GetCurrentThreadId(), ((Float64)(CAHostTimeBase::GetCurrentTimeInNanos()) / 1000000.0), GetCurrentThreadId(), mName, mOwner);
+			#endif
+		}
+		else
+		{
+			//	any other return value means something really bad happenned
+			ThrowIfError(theError, CAException(GetLastError()), "CAMutex::Try: call to lock the mutex failed");
+		}
+	}
+	else
+	{
+		//	this means the current thread already owns the lock
+		theAnswer = true;
+		outWasLocked = false;
+	}
+#endif
 	
 	return theAnswer;
 }
 
+bool	CAMutex::IsFree() const
+{
+	return mOwner == 0;
+}
 
+bool	CAMutex::IsOwnedByCurrentThread() const
+{
+	bool theAnswer = true;
+	
+#if TARGET_OS_MAC
+	theAnswer = pthread_equal(pthread_self(), mOwner);
+#elif TARGET_OS_WIN32
+	theAnswer = (mOwner == GetCurrentThreadId());
+#endif
+
+	return theAnswer;
+}

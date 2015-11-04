@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -70,12 +70,12 @@ public:
 	CAAudioFileReader(int nBuffers, UInt32 bufferSizeFrames) :
 		CAPullBufferQueue(nBuffers, bufferSizeFrames) { }
 	
-	void				SetFile(AudioFileID fileID);
+	void				SetFile(const FSRef &inFile);
 	virtual void		Start();
 	virtual void		Stop();
 	double				GetCurrentPosition() const;	// 0-1
-	SInt64				GetCurrentPacket() const { return mFile->TellPacket(); }
-	SInt64				GetNumberPackets() const { return mFile->GetNumberPackets(); }
+	SInt64				GetCurrentFrame() const;// { return mFile->Tell(); }
+	SInt64				GetNumberFrames() const { return mFile->GetNumberFrames(); }
 
 	void				SetCurrentPosition(double loc);	// 0-1
 
@@ -86,14 +86,12 @@ private:
 			CABufferQueue::Buffer(queue, fmt, nBytes)
 		{ }
 		
-		void			SetEmpty();
-		void			UpdateAfterRead(SInt64 startPacket, SInt64 endPacket, UInt32 nFramesRead);
-		void			GetLocation(SInt64 &pkt0, SInt64 &pkt1, UInt32 &frm0, UInt32 &frm1) const {
-							pkt0 = mStartPacket; pkt1 = mEndPacket;
-							frm0 = mStartFrame; frm1 = mEndFrame;
+		void			UpdateAfterRead(SInt64 curFrame, UInt32 nFramesRead);
+		void			GetLocation(UInt32 &frm0, UInt32 &frame1) const {
+							frm0 = mStartFrame; frame1 = mEndFrame;
 						}
-	private:
-		SInt64			mStartPacket, mEndPacket;	// range of packets in buffer
+		
+		SInt64			mBufferStartFileFrame;
 	};
 	
 	virtual CABufferQueue::Buffer *	CreateBuffer(const CAStreamBasicDescription &fmt, UInt32 nBytes) {
@@ -112,8 +110,8 @@ public:
 	CAAudioFileWriter(int nBuffers, UInt32 bufferSizeFrames) :
 		CAPushBufferQueue(nBuffers, bufferSizeFrames) { }
 
-	void				SetFile(AudioFileID fileID, Float64 ioSampleRate);
-	void				SetFile(const char *recordFilePath, AudioFileTypeID filetype, const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout, Float64 ioSampleRate);
+	void				SetFile(AudioFileID file);
+	void				SetFile(const FSRef &parentDir, CFStringRef filename, AudioFileTypeID filetype, const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout);
 	virtual void		Start();
 	virtual void		Stop();
 

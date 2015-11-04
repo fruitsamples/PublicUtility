@@ -1,4 +1,4 @@
-/*	Copyright: 	© Copyright 2004 Apple Computer, Inc. All rights reserved.
+/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 			("Apple") in consideration of your agreement to the following terms, and your
@@ -35,26 +35,54 @@
 			(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
 			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
+/*==================================================================================================
 	CAMutex.h
 	
-=============================================================================*/
+	
+	Revision 1.4  2004/10/28 01:11:58  dwyatt
+	[a radar for each of our projects] CAMutex.cpp (not .h) requires errno.h
+	
+	Revision 1.3  2004/10/28 00:14:21  ealdrich
+	Radar 3855797: Add include of errno.h to mac os builds
+	
+	Revision 1.2  2004/08/26 08:13:33  jcm10
+	finish bring up on Windows
+	
+	Revision 1.1  2003/12/17 20:56:59  dwyatt
+	new base class for CAGuard
+	
+	created Wed Dec 17 2003, Doug Wyatt
+	Copyright (c) 2003 Apple Computer, Inc.  All Rights Reserved
+
+	$NoKeywords: $
+==================================================================================================*/
 
 #ifndef __CAMutex_h__
 #define __CAMutex_h__
 
-//=============================================================================
+//==================================================================================================
 //	Includes
-//=============================================================================
+//==================================================================================================
 
+//	System Includes
 #if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
 	#include <CoreAudio/CoreAudioTypes.h>
 #else
 	#include <CoreAudioTypes.h>
 #endif
-#include <pthread.h>
 
+#if TARGET_OS_MAC
+	#include <pthread.h>
+#elif TARGET_OS_WIN32
+	#include <windows.h>
+#else
+	#error	Unsupported operating system
+#endif
+
+//==================================================================================================
 //	A recursive mutex.
+//==================================================================================================
+
 class	CAMutex
 {
 //	Construction/Destruction
@@ -67,12 +95,20 @@ public:
 	virtual bool	Lock();
 	virtual void	Unlock();
 	virtual bool	Try(bool& outWasLocked);	// returns true if lock is free, false if not
+	
+	virtual bool	IsFree() const;
+	virtual bool	IsOwnedByCurrentThread() const;
 		
 //	Implementation
 protected:
 	const char*		mName;
+#if TARGET_OS_MAC
 	pthread_t		mOwner;
 	pthread_mutex_t	mMutex;
+#elif TARGET_OS_WIN32
+	UInt32			mOwner;
+	HANDLE			mMutex;
+#endif
 
 //	Helper class to manage taking and releasing recursively
 public:
