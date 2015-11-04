@@ -227,27 +227,33 @@ bool	CAAudioFileFormats::InferDataFormatFromFileFormat(AudioFileTypeID filetype,
 	return false;
 }
 
+bool	CAAudioFileFormats::InferFileFormatFromFilename(CFStringRef filename, AudioFileTypeID &filetype)
+{
+	bool result = false;
+	CFRange range = CFStringFind(filename, CFSTR("."), kCFCompareBackwards);
+	if (range.location == kCFNotFound) return false;
+	range.location += 1;
+	range.length = CFStringGetLength(filename) - range.location;
+	CFStringRef ext = CFStringCreateWithSubstring(NULL, filename, range);
+	for (int i = 0; i < mNumFileFormats; ++i) {
+		FileFormatInfo *ffi = &mFileFormats[i];
+		if (ffi->MatchExtension(ext)) {
+			filetype = ffi->mFileTypeID;
+			result = true;
+			break;
+		}
+	}
+	CFRelease(ext);
+	return result;
+}
+
 bool	CAAudioFileFormats::InferFileFormatFromFilename(const char *filename, AudioFileTypeID &filetype)
 {
 	if (filename == NULL) return false;
-	
-	const char *inExt = strrchr(filename, '.');
-	if (inExt == NULL) return false;
-	++inExt;	// skip '.'
-
-	for (int i = 0; i < mNumFileFormats; ++i) {
-		FileFormatInfo *ffi = &mFileFormats[i];
-		int next = ffi->NumberOfExtensions();
-		for (int j = 0; j < next; ++j) {
-			char ext[32];
-			ffi->GetExtension(j, ext, sizeof(ext));
-			if (!strcmp(inExt, ext)) {
-				filetype = ffi->mFileTypeID;
-				return true;
-			}
-		}
-	}
-	return false;
+	CFStringRef cfname = CFStringCreateWithCString(NULL, filename, kCFStringEncodingUTF8);
+	bool result = InferFileFormatFromFilename(cfname, filetype);
+	CFRelease(cfname);
+	return result;
 }
 
 bool	CAAudioFileFormats::InferFileFormatFromDataFormat(const CAStreamBasicDescription &fmt, 
@@ -326,8 +332,15 @@ int		StrToOSType(const char *str, OSType &t)
 	int x;
 	for (int i = 0; i < 4; ++i) {
 		if (*p != '\\') {
-			if ((buf[i] = *p++) == '\0')
+			if ((buf[i] = *p++) == '\0') {
+				// special-case for 'aac ': if we only got three characters, assume the last was a space
+				if (i == 3) {
+					--p;
+					buf[i] = ' ';
+					break;
+				}
 				goto fail;
+			}
 		} else {
 			if (*++p != 'x') goto fail;
 			if (sscanf(++p, "%02X", &x) != 1) goto fail;

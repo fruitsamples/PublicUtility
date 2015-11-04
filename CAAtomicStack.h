@@ -105,6 +105,18 @@ public:
 		return result;
 	}
 	
+	T*		pop_all_reversed()
+	{
+		TAtomicStack<T> reversed;
+		T *p = pop_all(), *next;
+		while (p != NULL) {
+			next = p->get_next();
+			reversed.push_NA(p);
+			p = next;
+		}
+		return reversed.mHead;
+	}
+	
 	bool	compare_and_swap(T *oldvalue, T *newvalue, T **pvalue)
 	{
 #if __LP64__

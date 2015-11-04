@@ -272,16 +272,8 @@
                                                     0,
                                                     &presetToSet,
                                                     sizeof(AUPreset)	);
-    if (result != noErr) {
-        result = AudioUnitSetProperty (	mAudioUnit,
-                                        kAudioUnitProperty_CurrentPreset,
-                                        kAudioUnitScope_Global,
-                                        0,
-                                        &presetToSet,
-                                        sizeof(AUPreset)	);
-        if (result != noErr)
-			return NO;
-    }
+    if (result != noErr) 
+		return NO;
     
     // now get classInfo & write to file
     CFPropertyListRef classInfo = NULL;
@@ -330,17 +322,8 @@
 														0,
 														&presetToSet,
 														sizeof(AUPreset)	);
-		if (result != noErr) {
-			// try old 'currentPreset' property if presentPreset doesn't work
-			result = AudioUnitSetProperty (	mAudioUnit,
-											kAudioUnitProperty_CurrentPreset,
-											kAudioUnitScope_Global,
-											0,
-											&presetToSet,
-											sizeof(AUPreset)	);
-			if (result != noErr)
-				return NO;
-		}
+		if (result != noErr)
+			return NO;
     }
 	else
 	{

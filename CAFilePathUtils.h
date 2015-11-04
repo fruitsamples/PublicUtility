@@ -36,107 +36,28 @@
 			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 /*=============================================================================
-	CAAudioFileFormats.h
+	CAFilePathUtils.h
 	
 =============================================================================*/
 
-#ifndef __CAAudioFileFormats_h__
-#define __CAAudioFileFormats_h__
+#ifndef __CAFilePathUtils_h__
+#define __CAFilePathUtils_h__
 
 #if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
-	#include <AudioToolbox/AudioToolbox.h>
+	#include <CoreServices/CoreServices.h>
+	#include <CoreFoundation/CoreFoundation.h>
 #else
-	#include <AudioToolbox.h>
-#endif
-#include "CAStreamBasicDescription.h"
-
-class CAAudioFileFormats {
-public:
-	struct DataFormatInfo {
-		DataFormatInfo() : mVariants(NULL) { }
-		~DataFormatInfo() { delete[] mVariants; }
-		
-		UInt32							mFormatID;
-		int								mNumVariants;
-		AudioStreamBasicDescription *	mVariants;
-		bool							mReadable;
-		bool							mWritable;
-		bool							mEitherEndianPCM;
-
-#if DEBUG
-		void	DebugPrint();
-#endif
-	};
-	
-	struct FileFormatInfo {
-		FileFormatInfo() : mFileTypeName(NULL), mExtensions(NULL), mDataFormats(NULL) { }
-		~FileFormatInfo() {
-			delete[] mDataFormats;
-			if (mFileTypeName)
-				CFRelease(mFileTypeName);
-			if (mExtensions)
-				CFRelease(mExtensions);
-		}
-		
-		AudioFileTypeID					mFileTypeID;
-		CFStringRef						mFileTypeName;
-		CFArrayRef						mExtensions;
-		int								mNumDataFormats;
-		DataFormatInfo *				mDataFormats;
-		
-		int		NumberOfExtensions() { return mExtensions ? CFArrayGetCount(mExtensions) : 0; }
-		char *	GetExtension(int index, char *buf, int buflen) {
-					CFStringRef cfext = (CFStringRef)CFArrayGetValueAtIndex(mExtensions, index);
-					CFStringGetCString(cfext, buf, buflen, kCFStringEncodingUTF8);
-					return buf;
-				}
-		bool	MatchExtension(CFStringRef testExt) {	// testExt should not include "."
-					CFIndex n = NumberOfExtensions();
-					for (CFIndex i = 0; i < n; ++i) {
-						CFStringRef ext = (CFStringRef)CFArrayGetValueAtIndex(mExtensions, i);
-						if (CFStringCompare(ext, testExt, kCFCompareCaseInsensitive) == kCFCompareEqualTo)
-							return true;
-					}
-					return false;
-				}
-		bool	AnyWritableFormats();
-		
-#if DEBUG
-		void	DebugPrint();
-#endif
-	};
-	
-private:	// use Instance()
-	CAAudioFileFormats();
-	~CAAudioFileFormats();
-public:
-	
-	bool	InferDataFormatFromFileFormat(AudioFileTypeID filetype, CAStreamBasicDescription &fmt);
-	
-	bool	InferFileFormatFromFilename(const char *filename, AudioFileTypeID &filetype);
-
-	bool	InferFileFormatFromFilename(CFStringRef filename, AudioFileTypeID &filetype);
-
-	bool	InferFileFormatFromDataFormat(const CAStreamBasicDescription &fmt, AudioFileTypeID &filetype);
-
-	bool	IsKnownDataFormat(UInt32 dataFormat);
-	
-#if DEBUG
-	void	DebugPrint();
+	#include <TargetConditionals.h>
+	#include <CoreServices.h>
+	#include <CoreFoundation.h>
 #endif
 
-	int					mNumFileFormats;
-	FileFormatInfo	*	mFileFormats;
-	
-	FileFormatInfo *	FindFileFormat(UInt32 formatID);
+OSStatus	PosixPathToParentFSRefAndName(const char *path, FSRef &outParentDir, CFStringRef &outFileName);
+#if !TARGET_OS_WIN32
+	#include <libgen.h>
+#else
+	char*	dirname(const char* inPath);
+	char*	basename(const char* inPath);
+#endif
 
-	static CAAudioFileFormats *	Instance();
-
-private:	
-	static CAAudioFileFormats *	sInstance;
-};
-
-char *	OSTypeToStr(char *buf, UInt32 t);
-int		StrToOSType(const char *str, UInt32 &t);
-
-#endif // __CAAudioFileFormats_h__
+#endif // __CAFilePathUtils_h__
