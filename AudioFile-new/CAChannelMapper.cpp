@@ -1,39 +1,42 @@
-/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
-
-	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
-			("Apple") in consideration of your agreement to the following terms, and your
-			use, installation, modification or redistribution of this Apple software
-			constitutes acceptance of these terms.  If you do not agree with these terms,
-			please do not use, install, modify or redistribute this Apple software.
-
-			In consideration of your agreement to abide by the following terms, and subject
-			to these terms, Apple grants you a personal, non-exclusive license, under Apple’s
-			copyrights in this original Apple software (the "Apple Software"), to use,
-			reproduce, modify and redistribute the Apple Software, with or without
-			modifications, in source and/or binary forms; provided that if you redistribute
-			the Apple Software in its entirety and without modifications, you must retain
-			this notice and the following text and disclaimers in all such redistributions of
-			the Apple Software.  Neither the name, trademarks, service marks or logos of
-			Apple Computer, Inc. may be used to endorse or promote products derived from the
-			Apple Software without specific prior written permission from Apple.  Except as
-			expressly stated in this notice, no other rights or licenses, express or implied,
-			are granted by Apple herein, including but not limited to any patent rights that
-			may be infringed by your derivative works or by other works in which the Apple
-			Software may be incorporated.
-
-			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE MAKES NO
-			WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION THE IMPLIED
-			WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-			PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND OPERATION ALONE OR IN
-			COMBINATION WITH YOUR PRODUCTS.
-
-			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR
-			CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-			GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-			ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION, MODIFICATION AND/OR DISTRIBUTION
-			OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF CONTRACT, TORT
-			(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
-			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*	Copyright © 2007 Apple Inc. All Rights Reserved.
+	
+	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
+			Apple Inc. ("Apple") in consideration of your agreement to the
+			following terms, and your use, installation, modification or
+			redistribution of this Apple software constitutes acceptance of these
+			terms.  If you do not agree with these terms, please do not use,
+			install, modify or redistribute this Apple software.
+			
+			In consideration of your agreement to abide by the following terms, and
+			subject to these terms, Apple grants you a personal, non-exclusive
+			license, under Apple's copyrights in this original Apple software (the
+			"Apple Software"), to use, reproduce, modify and redistribute the Apple
+			Software, with or without modifications, in source and/or binary forms;
+			provided that if you redistribute the Apple Software in its entirety and
+			without modifications, you must retain this notice and the following
+			text and disclaimers in all such redistributions of the Apple Software. 
+			Neither the name, trademarks, service marks or logos of Apple Inc. 
+			may be used to endorse or promote products derived from the Apple
+			Software without specific prior written permission from Apple.  Except
+			as expressly stated in this notice, no other rights or licenses, express
+			or implied, are granted by Apple herein, including but not limited to
+			any patent rights that may be infringed by your derivative works or by
+			other works in which the Apple Software may be incorporated.
+			
+			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+			MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+			THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+			FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+			OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+			
+			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+			OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+			SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+			INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+			MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+			AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+			POSSIBILITY OF SUCH DAMAGE.
 */
 /*=============================================================================
 	CAChannelMapper.cpp
@@ -45,6 +48,10 @@
 	#include <AudioToolbox/AudioToolbox.h>
 #else
 	#include <AudioToolbox.h>
+#endif
+
+#if DEBUG
+	//#define VERBOSE 1
 #endif
 
 static void DefaultChannelLayout(CAAudioChannelLayout &layout, UInt32 nchannels)
@@ -92,9 +99,9 @@ OSStatus	CAChannelMapper::OpenMixer(double sampleRate)
 	fmt.mSampleRate = sampleRate;
 	UInt32 nbuses = 1;
 
-	err = mMatrixMixer.SetProperty(kAudioUnitProperty_BusCount, kAudioUnitScope_Input, 0, &nbuses, sizeof(UInt32));
+	err = mMatrixMixer.SetProperty(kAudioUnitProperty_ElementCount, kAudioUnitScope_Input, 0, &nbuses, sizeof(UInt32));
 	if (err) return err;
-	err = mMatrixMixer.SetProperty(kAudioUnitProperty_BusCount, kAudioUnitScope_Output, 0, &nbuses, sizeof(UInt32));
+	err = mMatrixMixer.SetProperty(kAudioUnitProperty_ElementCount, kAudioUnitScope_Output, 0, &nbuses, sizeof(UInt32));
 	if (err) return err;
 
 	fmt.SetCanonical(mSrcNChannels, false);
@@ -153,23 +160,49 @@ OSStatus	CAChannelMapper::ConfigureDownmix()
 	const AudioChannelLayout *layouts[] = { &mSrcLayout.Layout(), &mDestLayout.Layout() };
 	UInt32 propSize;
 	err = AudioFormatGetPropertyInfo(kAudioFormatProperty_MatrixMixMap, sizeof(layouts), layouts, &propSize);
+#if VERBOSE
+	printf("layout tags 0x%x -> 0x%x, size %d, err %d\n", (int)layouts[0]->mChannelLayoutTag, (int)layouts[1]->mChannelLayoutTag, (int)propSize, (int)err);
+#endif
 	if (err)
 		return err;
 	
+	const int nin = mSrcNChannels, nout = mDestNChannels;
+	propSize = std::max((size_t)propSize, nin * nout * sizeof(Float32));
+	
 	void *mixmap = malloc(propSize);
 	err = AudioFormatGetProperty(kAudioFormatProperty_MatrixMixMap, sizeof(layouts), layouts, &propSize, mixmap);
-	if (!err) {
-		mMatrixMixer.SetParameter(kMatrixMixerParam_Volume, kAudioUnitScope_Global, 0xFFFFFFFF, 1.);
-		int nin = mSrcNChannels, nout = mDestNChannels;
-		int i, j;
-		// set the crosspoint volumes
-		Float32 *val = (Float32 *)mixmap;
+
+	int i, j;
+	Float32 *val;
+
+	if (err) {
+		// generate a default mix map
+		val = (Float32 *)mixmap;
 		for (i = 0; i < nin; ++i) {
 			for (j = 0; j < nout; ++j) {
-				mMatrixMixer.SetParameter(kMatrixMixerParam_Volume, kAudioUnitScope_Global, (i<<16) | j, *val++);
+				*val++ = (i == j) ? 1.0f : 0.0f;
 			}
 		}
 	}
+
+#if VERBOSE
+	printf("mix map:");
+#endif
+	mMatrixMixer.SetParameter(kMatrixMixerParam_Volume, kAudioUnitScope_Global, 0xFFFFFFFF, 1.);
+	// set the crosspoint volumes
+	val = (Float32 *)mixmap;
+	for (i = 0; i < nin; ++i) {
+		for (j = 0; j < nout; ++j) {
+#if VERBOSE
+			printf("  %5.3f", *val);
+#endif
+			mMatrixMixer.SetParameter(kMatrixMixerParam_Volume, kAudioUnitScope_Global, (i<<16) | j, *val++);
+		}
+#if VERBOSE
+		putchar('\n');
+#endif
+	}
+
 	free(mixmap);
 	return noErr;
 }
@@ -199,7 +232,7 @@ OSStatus	CAChannelMapper::MixerInputProc(
 {
 	CAChannelMapper *This = static_cast<CAChannelMapper *>(inRefCon);
 	const AudioBufferList *mixInputBufferList = This->mMixInputBufferList;
-	UInt32 copySize = sizeof(UInt32) + (mixInputBufferList->mNumberBuffers * sizeof(AudioBuffer));
+	UInt32 copySize = offsetof(AudioBufferList, mBuffers) + (mixInputBufferList->mNumberBuffers * sizeof(AudioBuffer));
 	memcpy(ioData, mixInputBufferList, copySize);
 	
 	return noErr;

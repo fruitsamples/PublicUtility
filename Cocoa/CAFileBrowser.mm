@@ -1,182 +1,48 @@
-/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
-
-	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
-			("Apple") in consideration of your agreement to the following terms, and your
-			use, installation, modification or redistribution of this Apple software
-			constitutes acceptance of these terms.  If you do not agree with these terms,
-			please do not use, install, modify or redistribute this Apple software.
-
-			In consideration of your agreement to abide by the following terms, and subject
-			to these terms, Apple grants you a personal, non-exclusive license, under Apple’s
-			copyrights in this original Apple software (the "Apple Software"), to use,
-			reproduce, modify and redistribute the Apple Software, with or without
-			modifications, in source and/or binary forms; provided that if you redistribute
-			the Apple Software in its entirety and without modifications, you must retain
-			this notice and the following text and disclaimers in all such redistributions of
-			the Apple Software.  Neither the name, trademarks, service marks or logos of
-			Apple Computer, Inc. may be used to endorse or promote products derived from the
-			Apple Software without specific prior written permission from Apple.  Except as
-			expressly stated in this notice, no other rights or licenses, express or implied,
-			are granted by Apple herein, including but not limited to any patent rights that
-			may be infringed by your derivative works or by other works in which the Apple
-			Software may be incorporated.
-
-			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE MAKES NO
-			WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION THE IMPLIED
-			WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-			PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND OPERATION ALONE OR IN
-			COMBINATION WITH YOUR PRODUCTS.
-
-			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR
-			CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-			GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-			ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION, MODIFICATION AND/OR DISTRIBUTION
-			OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF CONTRACT, TORT
-			(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
-			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*	Copyright © 2007 Apple Inc. All Rights Reserved.
+	
+	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
+			Apple Inc. ("Apple") in consideration of your agreement to the
+			following terms, and your use, installation, modification or
+			redistribution of this Apple software constitutes acceptance of these
+			terms.  If you do not agree with these terms, please do not use,
+			install, modify or redistribute this Apple software.
+			
+			In consideration of your agreement to abide by the following terms, and
+			subject to these terms, Apple grants you a personal, non-exclusive
+			license, under Apple's copyrights in this original Apple software (the
+			"Apple Software"), to use, reproduce, modify and redistribute the Apple
+			Software, with or without modifications, in source and/or binary forms;
+			provided that if you redistribute the Apple Software in its entirety and
+			without modifications, you must retain this notice and the following
+			text and disclaimers in all such redistributions of the Apple Software. 
+			Neither the name, trademarks, service marks or logos of Apple Inc. 
+			may be used to endorse or promote products derived from the Apple
+			Software without specific prior written permission from Apple.  Except
+			as expressly stated in this notice, no other rights or licenses, express
+			or implied, are granted by Apple herein, including but not limited to
+			any patent rights that may be infringed by your derivative works or by
+			other works in which the Apple Software may be incorporated.
+			
+			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+			MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+			THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+			FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+			OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+			
+			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+			OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+			SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+			INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+			MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+			AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+			POSSIBILITY OF SUCH DAMAGE.
 */
 /*=============================================================================
  *  CAFileBrowser.mm
  *  PlayPen
  *-----------------------------------------------------------------------------
  *
- *
- * Revision 1.12  2005/05/17 18:24:48  luke
- * change file-system timeouts from 5sec to 90sec (rdar://problem/4110219)
- *
- * Revision 1.11  2005/05/02 17:47:44  luke
- * don't invoke renaming bahvior if user is pressing keys
- *
- * Revision 1.10  2004/12/19 20:27:18  luke
- * add 'presetName:ExistsAsChildOf:' method
- *
- * Revision 1.9  2004/12/19 18:11:45  luke
- * only expand 1st level user/local/network root items
- *
- * Revision 1.8  2004/11/16 17:36:17  luke
- * last part of fix for [3747338]
- *
- * Revision 1.7  2004/11/13 17:51:12  luke
- * fix warning
- *
- * Revision 1.6  2004/11/13 17:46:17  luke
- * removed NSAsserts & better handling errors
- *
- * Revision 1.5  2004/10/29 01:17:18  luke
- * fix warnings in Panther
- *
- * Revision 1.4  2004/09/20 17:10:23  luke
- * conditionalize some NSTableView API usage based on OSX version (due to AppKit API deprecation)
- *
- * Revision 1.3  2004/08/03 18:34:16  luke
- * tweaks
- *
- * Revision 1.2  2004/08/03 18:31:17  luke
- * tighten up setName code
- *
- * Revision 1.1  2004/07/29 00:21:15  luke
- * factored out from PlayPen
- *
- * Revision 1.17  2004/07/29 00:08:51  luke
- * tweaks
- *
- * Revision 1.16  2004/07/28 23:57:20  luke
- * pass 3: final
- *
- * Revision 1.15  2004/07/28 21:43:26  luke
- * 2nd pass: CAFileBrowser API breakup
- *
- * Revision 1.14  2004/07/28 20:50:15  luke
- * first pass: transition into approved API
- *
- * Revision 1.13  2004/07/22 19:44:35  luke
- * Panther fix...
- *
- * Revision 1.12  2004/07/21 23:54:42  luke
- * fix warnings on Tiger
- *
- * Revision 1.11  2004/07/07 00:24:16  luke
- * [3482090] make AUInspector localizable
- *
- * Revision 1.10  2004/07/02 01:02:31  mhopkins
- * Fixed hang renaming files
- *
- * Revision 1.9  2004/06/24 23:21:58  mhopkins
- * added methods to return name and data key strings
- *
- * Revision 1.8  2004/05/27 22:55:50  luke
- * fix last network-access dangler.  allow preset renaming to be blocked by subclasses
- *
- * Revision 1.7  2004/05/26 21:54:27  luke
- * remove NSLog()
- *
- * Revision 1.6  2004/05/26 21:09:54  luke
- * add hasPresets method
- *
- * Revision 1.5  2004/05/26 19:41:23  luke
- * fix font clipping
- *
- * Revision 1.4  2004/05/26 18:20:38  luke
- * [3665153] fix MIDIThru preset dictionary embedding
- *
- * Revision 1.3  2004/05/26 17:13:01  luke
- * [3656248] only search Network for presets when preferences say to do so
- *
- * Revision 1.2  2004/05/25 22:25:19  luke
- * allow preset renaming (per [3616417])
- *
- * Revision 1.1  2004/04/17 20:05:20  luke
- * source reorg.
- *
- * Revision 1.15  2003/12/18 19:48:29  luke
- * push directory-creation code into CAFileBrowser superclass
- *
- * Revision 1.14  2003/11/06 19:28:23  luke
- * pull 'savePresetWithName:asLocal: into superclass
- *
- * Revision 1.13  2003/10/28 19:02:37  luke
- * tweaks
- *
- * Revision 1.12  2003/10/27 23:57:29  luke
- * treat enter/return press as a double-click
- *
- * Revision 1.11  2003/10/22 22:17:32  luke
- * add path accessor
- *
- * Revision 1.10  2003/10/22 00:08:24  mhopkins
- * Added initWithCoder method so browser can be instantiated via a nib file
- *
- * Revision 1.9  2003/10/21 23:28:26  luke
- * added features that future subclasses may need
- *
- * Revision 1.8  2003/10/21 22:03:31  luke
- * inherit from NSOutlineView & change some behavior per discussion with Bill
- *
- * Revision 1.7  2003/10/21 20:27:30  luke
- * fix edge null-deref error
- *
- * Revision 1.6  2003/10/20 18:29:14  luke
- * improve preset mgr. behavior (still not correct on scrolling though)
- *
- * Revision 1.5  2003/10/16 22:38:39  luke
- * improved behavior
- *
- * Revision 1.4  2003/10/15 16:56:43  luke
- * tighten up code.
- *
- * Revision 1.3  2003/10/15 00:46:03  luke
- * tighten up code
- *
- * Revision 1.2  2003/10/15 00:26:28  luke
- * label preset groups
- *
- * Revision 1.1  2003/10/15 00:12:30  luke
- * new file
- *
- *
- *-----------------------------------------------------------------------------
- *  Created by Luke Bellandi on Tue Oct 14 2003.
- *  Copyright (c) 2003 Apple Computer Inc. All rights reserved.
  *=============================================================================*/
 
 #import "CAFileHandling.h"

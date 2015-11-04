@@ -1,39 +1,42 @@
-/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
-
-	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
-			("Apple") in consideration of your agreement to the following terms, and your
-			use, installation, modification or redistribution of this Apple software
-			constitutes acceptance of these terms.  If you do not agree with these terms,
-			please do not use, install, modify or redistribute this Apple software.
-
-			In consideration of your agreement to abide by the following terms, and subject
-			to these terms, Apple grants you a personal, non-exclusive license, under Apple’s
-			copyrights in this original Apple software (the "Apple Software"), to use,
-			reproduce, modify and redistribute the Apple Software, with or without
-			modifications, in source and/or binary forms; provided that if you redistribute
-			the Apple Software in its entirety and without modifications, you must retain
-			this notice and the following text and disclaimers in all such redistributions of
-			the Apple Software.  Neither the name, trademarks, service marks or logos of
-			Apple Computer, Inc. may be used to endorse or promote products derived from the
-			Apple Software without specific prior written permission from Apple.  Except as
-			expressly stated in this notice, no other rights or licenses, express or implied,
-			are granted by Apple herein, including but not limited to any patent rights that
-			may be infringed by your derivative works or by other works in which the Apple
-			Software may be incorporated.
-
-			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE MAKES NO
-			WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION THE IMPLIED
-			WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-			PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND OPERATION ALONE OR IN
-			COMBINATION WITH YOUR PRODUCTS.
-
-			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR
-			CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-			GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-			ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION, MODIFICATION AND/OR DISTRIBUTION
-			OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF CONTRACT, TORT
-			(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
-			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*	Copyright © 2007 Apple Inc. All Rights Reserved.
+	
+	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
+			Apple Inc. ("Apple") in consideration of your agreement to the
+			following terms, and your use, installation, modification or
+			redistribution of this Apple software constitutes acceptance of these
+			terms.  If you do not agree with these terms, please do not use,
+			install, modify or redistribute this Apple software.
+			
+			In consideration of your agreement to abide by the following terms, and
+			subject to these terms, Apple grants you a personal, non-exclusive
+			license, under Apple's copyrights in this original Apple software (the
+			"Apple Software"), to use, reproduce, modify and redistribute the Apple
+			Software, with or without modifications, in source and/or binary forms;
+			provided that if you redistribute the Apple Software in its entirety and
+			without modifications, you must retain this notice and the following
+			text and disclaimers in all such redistributions of the Apple Software. 
+			Neither the name, trademarks, service marks or logos of Apple Inc. 
+			may be used to endorse or promote products derived from the Apple
+			Software without specific prior written permission from Apple.  Except
+			as expressly stated in this notice, no other rights or licenses, express
+			or implied, are granted by Apple herein, including but not limited to
+			any patent rights that may be infringed by your derivative works or by
+			other works in which the Apple Software may be incorporated.
+			
+			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+			MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+			THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+			FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+			OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+			
+			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+			OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+			SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+			INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+			MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+			AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+			POSSIBILITY OF SUCH DAMAGE.
 */
 /*=============================================================================
 	CAMIDIEndpoints.cpp
@@ -48,114 +51,12 @@
 // The result should be released by the caller.
 static CFStringRef EndpointName(MIDIEndpointRef endpoint, bool isExternal)
 {
-	CFMutableStringRef result = CFStringCreateMutable(NULL, 0);
-	CFStringRef str;
+	CFStringRef result = CFSTR("");	// default
 	
-	// begin with the endpoint's name
-	str = NULL;
-	MIDIObjectGetStringProperty(endpoint, kMIDIPropertyName, &str);
-	if (str != NULL) {
-		CFStringAppend(result, str);
-		CFRelease(str);
-	}
-
-	MIDIEntityRef entity = NULL;
-	MIDIEndpointGetEntity(endpoint, &entity);
-	if (entity == NULL)
-		// probably virtual
-		return result;
-		
-	if (CFStringGetLength(result) == 0) {
-		// endpoint name has zero length -- try the entity
-		str = NULL;
-		MIDIObjectGetStringProperty(entity, kMIDIPropertyName, &str);
-		if (str != NULL) {
-			CFStringAppend(result, str);
-			CFRelease(str);
-		}
-	}
-	// now consider the device's name
-	MIDIDeviceRef device = NULL;
-	MIDIEntityGetDevice(entity, &device);
-	if (device == NULL)
-		return result;
+	MIDIObjectGetStringProperty(endpoint, kMIDIPropertyDisplayName, &result);
 	
-	str = NULL;
-	MIDIObjectGetStringProperty(device, kMIDIPropertyName, &str);
-	if (str != NULL) {
-		// if an external device has only one entity, throw away the endpoint name and just use the device name
-		if (isExternal && MIDIDeviceGetNumberOfEntities(device) < 2) {
-			CFRelease(result);
-			return str;
-		} else {
-			// does the entity name already start with the device name? (some drivers do this though they shouldn't)
-			// if so, do not prepend
-			if (CFStringCompareWithOptions(str /* device name */, result /* endpoint name */, CFRangeMake(0, CFStringGetLength(str)), 0) != kCFCompareEqualTo) {
-				// prepend the device name to the entity name
-				if (CFStringGetLength(result) > 0)
-					CFStringInsert(result, 0, CFSTR(" "));
-				CFStringInsert(result, 0, str);
-			}
-			CFRelease(str);
-		}
-	}
 	return result;
 }
-
-#if 0
-// Obtain the name of an endpoint, following connections.
-// The result should be released by the caller.
-static CFStringRef ConnectedEndpointName(MIDIEndpointRef endpoint)
-{
-	CFMutableStringRef result = CFStringCreateMutable(NULL, 0);
-	CFStringRef str;
-	OSStatus err;
-	
-	// Does the endpoint have connections?
-	CFDataRef connections = NULL;
-	int nConnected = 0;
-	bool anyStrings = false;
-	err = MIDIObjectGetDataProperty(endpoint, kMIDIPropertyConnectionUniqueID, &connections);
-	if (connections != NULL) {
-		// It has connections, follow them
-		// Concatenate the names of all connected devices
-		nConnected = CFDataGetLength(connections) / sizeof(MIDIUniqueID);
-		if (nConnected) {
-			const SInt32 *pid = reinterpret_cast<const SInt32 *>(CFDataGetBytePtr(connections));
-			for (int i = 0; i < nConnected; ++i, ++pid) {
-				MIDIUniqueID id = EndianS32_BtoN(*pid);
-				MIDIObjectRef connObject;
-				MIDIObjectType connObjectType;
-				err = MIDIObjectFindByUniqueID(id, &connObject, &connObjectType);
-				if (err == noErr) {
-					if (connObjectType == kMIDIObjectType_ExternalSource 
-					|| connObjectType == kMIDIObjectType_ExternalDestination) {
-						// Connected to an external device's endpoint (10.3 and later).
-						str = EndpointName(static_cast<MIDIEndpointRef>(connObject), true);
-					} else {
-						// Connected to an external device (10.2) (or something else, catch-all)
-						str = NULL;
-						MIDIObjectGetStringProperty(connObject, kMIDIPropertyName, &str);
-					}
-					if (str != NULL) {
-						if (anyStrings)
-							CFStringAppend(result, CFSTR(", "));
-						else anyStrings = true;
-						CFStringAppend(result, str);
-						CFRelease(str);
-					}
-				}
-			}
-		}
-		CFRelease(connections);
-	}
-	if (anyStrings)
-		return result;
-	
-	// Here, either the endpoint had no connections, or we failed to obtain names for any of them.
-	return EndpointName(endpoint, false);
-}
-#endif
 
 // ____________________________________________________________________________
 

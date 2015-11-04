@@ -1,44 +1,43 @@
-/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
-
-	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
-			("Apple") in consideration of your agreement to the following terms, and your
-			use, installation, modification or redistribution of this Apple software
-			constitutes acceptance of these terms.  If you do not agree with these terms,
-			please do not use, install, modify or redistribute this Apple software.
-
-			In consideration of your agreement to abide by the following terms, and subject
-			to these terms, Apple grants you a personal, non-exclusive license, under AppleÕs
-			copyrights in this original Apple software (the "Apple Software"), to use,
-			reproduce, modify and redistribute the Apple Software, with or without
-			modifications, in source and/or binary forms; provided that if you redistribute
-			the Apple Software in its entirety and without modifications, you must retain
-			this notice and the following text and disclaimers in all such redistributions of
-			the Apple Software.  Neither the name, trademarks, service marks or logos of
-			Apple Computer, Inc. may be used to endorse or promote products derived from the
-			Apple Software without specific prior written permission from Apple.  Except as
-			expressly stated in this notice, no other rights or licenses, express or implied,
-			are granted by Apple herein, including but not limited to any patent rights that
-			may be infringed by your derivative works or by other works in which the Apple
-			Software may be incorporated.
-
-			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE MAKES NO
-			WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION THE IMPLIED
-			WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-			PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND OPERATION ALONE OR IN
-			COMBINATION WITH YOUR PRODUCTS.
-
-			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR
-			CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-			GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-			ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION, MODIFICATION AND/OR DISTRIBUTION
-			OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF CONTRACT, TORT
-			(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
-			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-/*=============================================================================
-	CAAudioFile.cpp
+/*	Copyright © 2007 Apple Inc. All Rights Reserved.
 	
-=============================================================================*/
+	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
+			Apple Inc. ("Apple") in consideration of your agreement to the
+			following terms, and your use, installation, modification or
+			redistribution of this Apple software constitutes acceptance of these
+			terms.  If you do not agree with these terms, please do not use,
+			install, modify or redistribute this Apple software.
+			
+			In consideration of your agreement to abide by the following terms, and
+			subject to these terms, Apple grants you a personal, non-exclusive
+			license, under Apple's copyrights in this original Apple software (the
+			"Apple Software"), to use, reproduce, modify and redistribute the Apple
+			Software, with or without modifications, in source and/or binary forms;
+			provided that if you redistribute the Apple Software in its entirety and
+			without modifications, you must retain this notice and the following
+			text and disclaimers in all such redistributions of the Apple Software. 
+			Neither the name, trademarks, service marks or logos of Apple Inc. 
+			may be used to endorse or promote products derived from the Apple
+			Software without specific prior written permission from Apple.  Except
+			as expressly stated in this notice, no other rights or licenses, express
+			or implied, are granted by Apple herein, including but not limited to
+			any patent rights that may be infringed by your derivative works or by
+			other works in which the Apple Software may be incorporated.
+			
+			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+			MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+			THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+			FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+			OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+			
+			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+			OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+			SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+			INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+			MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+			AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+			POSSIBILITY OF SUCH DAMAGE.
+*/
 /*=============================================================================
 	CAAudioFile.cpp
 	
@@ -129,6 +128,7 @@ CAAudioFile::CAAudioFile() :
 	mFinishingEncoding(false),
 	mMode(kClosed),
 	mFileDataOffset(-1),
+	mDecodeValidFrames(0),
 	mFramesToSkipFollowingSeek(0),
 	
 	mClientOwnsIOBuffer(false),
@@ -235,6 +235,7 @@ void	CAAudioFile::CreateNew(const FSRef &parentDir, CFStringRef filename, AudioF
 	XThrowIf(mMode != kClosed, kExtAudioFileError_InvalidOperationOrder, "file already open");
 	
 	mFileDataFormat = dataFormat;
+	mActualToBaseSampleRateRatio = 1.0;
 	if (layout) {
 		mFileChannelLayout = layout;
 #if VERBOSE_CHANNELMAP
@@ -271,7 +272,7 @@ void	CAAudioFile::FileFormatChanged(const FSRef *parentDir, CFStringRef filename
 		XThrowIfError(AudioConverterGetProperty(mConverter, kAudioConverterCurrentOutputStreamDescription, &propertySize, &mFileDataFormat), "get audio converter's output stream description");
 		// do the same for the channel layout being output by the converter
 #if VERBOSE_CONVERTER
-		mFileDataFormat.PrintFormat(stdout, "", "Converter output");
+		mFileDataFormat.PrintFormat(stdout, "", "Converter output          ");
 #endif
 		if (fiszero(mFileDataFormat.mSampleRate))
 			mFileDataFormat.mSampleRate = origSampleRate;
@@ -297,17 +298,17 @@ void	CAAudioFile::FileFormatChanged(const FSRef *parentDir, CFStringRef filename
 		if (fiszero(newFileDataFormat.mSampleRate))
 			newFileDataFormat.mSampleRate = 44100;	// just make something up for now
 #if VERBOSE_CONVERTER
-		newFileDataFormat.PrintFormat(stdout, "", "Applied to new file");
+		newFileDataFormat.PrintFormat(stdout, "", "Applied to new file A     ");
 #endif
 		XThrowIfError(AudioFileCreate(parentDir, filename, filetype, &newFileDataFormat, 0, &mFSRef, &mAudioFile), "create audio file");
 		mMode = kPreparingToWrite;
 		mOwnOpenFile = true;
-	} else if (saveFileDataFormat != mFileDataFormat || fnotequal(saveFileDataFormat.mSampleRate, mFileDataFormat.mSampleRate)) {
-		// second check must be explicit since operator== on ASBD treats SR of zero as "don't care"
+	} else if (!mFileDataFormat.IsEqual(saveFileDataFormat, false)) {
+		// data format changed
 		if (fiszero(mFileDataFormat.mSampleRate))
 			mFileDataFormat.mSampleRate = mClientDataFormat.mSampleRate;
 #if VERBOSE_CONVERTER
-		mFileDataFormat.PrintFormat(stdout, "", "Applied to new file");
+		mFileDataFormat.PrintFormat(stdout, "", "Applied to new file B     ");
 #endif
 		XThrowIf(fiszero(mFileDataFormat.mSampleRate), kExtAudioFileError_InvalidDataFormat, "file's sample rate is 0");
 		XThrowIfError(AudioFileSetProperty(mAudioFile, kAudioFilePropertyDataFormat, sizeof(AudioStreamBasicDescription), &mFileDataFormat), "couldn't update file's data format");
@@ -371,7 +372,7 @@ void	CAAudioFile::FileFormatChanged(const FSRef *parentDir, CFStringRef filename
 		}
 	}
 	
-	UpdateClientMaxPacketSize();	// also sets mFrame0Offset
+	UpdateInternals();
 	mPacketMark = 0;
 	mFrameMark = 0;
 }
@@ -431,27 +432,80 @@ void	CAAudioFile::SetNumberFrames(SInt64 nFrames)
 void	CAAudioFile::GetExistingFileInfo()
 {
 	LOG_FUNCTION("CAAudioFile::GetExistingFileInfo", "%p", this);
-	UInt32 propertySize;
+	UInt32 propertySize, formatListSize = 0;
 	OSStatus err;
+	bool gotFormatFromList = false;
 	
-	// get mFileDataFormat
-	propertySize = sizeof(AudioStreamBasicDescription);
-	XThrowIfError(AudioFileGetProperty(mAudioFile, kAudioFilePropertyDataFormat, &propertySize, &mFileDataFormat), "get audio file's data format");
-	
-	// get mFileChannelLayout
-	err = AudioFileGetPropertyInfo(mAudioFile, kAudioFilePropertyChannelLayout, &propertySize, NULL);
-	if (err == noErr && propertySize > 0) {
-		AudioChannelLayout *layout = static_cast<AudioChannelLayout *>(malloc(propertySize));
-		err = AudioFileGetProperty(mAudioFile, kAudioFilePropertyChannelLayout, &propertySize, layout);
+	err = AudioFileGetPropertyInfo(mAudioFile, 'flst' /*kAudioFilePropertyFormatList*/, &formatListSize, NULL);
+	if (err == noErr && formatListSize > 0) 
+	{
+		struct	TEMP_AudioFormatListItem {
+			AudioStreamBasicDescription		mASBD;
+			AudioChannelLayoutTag			mChannelLayoutTag;
+		};
+		
+		TEMP_AudioFormatListItem *formatList = (TEMP_AudioFormatListItem *)malloc(formatListSize);
+		propertySize = formatListSize;
+		err = AudioFileGetProperty(mAudioFile, 'flst' /*kAudioFilePropertyFormatList*/, &propertySize, formatList);
 		if (err == noErr) {
-			mFileChannelLayout = layout;
-#if VERBOSE_CHANNELMAP
-			printf("existing file's channel layout: %s\n", CAChannelLayouts::ConstantToString(mFileChannelLayout.Tag()));
-#endif
+			err = AudioFormatGetPropertyInfo(kAudioFormatProperty_DecodeFormatIDs, 0, NULL, &propertySize);
+			if (err == noErr && propertySize > 0) {
+				OSType *decodeTypes = (OSType *)malloc(propertySize);
+				err = AudioFormatGetProperty(kAudioFormatProperty_DecodeFormatIDs, 0, NULL, &propertySize, decodeTypes);
+				if (err == noErr) {
+					int nDecodeTypes = propertySize / sizeof(OSType);
+					int nformats = formatListSize / sizeof(TEMP_AudioFormatListItem);
+					
+					TEMP_AudioFormatListItem *aflip = formatList;
+					for ( ; --nformats >= 0; ++aflip) {
+						OSType *fmtp = decodeTypes;
+						for (int i = nDecodeTypes; --i >= 0; ++fmtp) {
+							if (*fmtp == aflip->mASBD.mFormatID) {
+								mFileDataFormat = aflip->mASBD;
+								if ((aflip->mChannelLayoutTag & 0xFFFF0000) != 0xFFFF0000 /*kAudioChannelLayoutTag_Unknown*/)
+									mFileChannelLayout.SetWithTag(aflip->mChannelLayoutTag);
+								gotFormatFromList = true;
+								goto foundFormat;
+							}
+						}
+					}
+				}
+foundFormat:
+				free(decodeTypes);
+			}
 		}
-		free(layout);
-		XThrowIfError(err, "get audio file's channel layout");
+		free(formatList);
 	}
+	
+	CAStreamBasicDescription baseFormat;
+	propertySize = sizeof(AudioStreamBasicDescription);
+	XThrowIfError(AudioFileGetProperty(mAudioFile, kAudioFilePropertyDataFormat, &propertySize, &baseFormat), "get audio file's data format");
+	
+	if (!gotFormatFromList) {
+		// get mFileDataFormat
+		mFileDataFormat = baseFormat;
+		
+		// get mFileChannelLayout
+		err = AudioFileGetPropertyInfo(mAudioFile, kAudioFilePropertyChannelLayout, &propertySize, NULL);
+		if (err == noErr && propertySize > 0) {
+			AudioChannelLayout *layout = static_cast<AudioChannelLayout *>(malloc(propertySize));
+			err = AudioFileGetProperty(mAudioFile, kAudioFilePropertyChannelLayout, &propertySize, layout);
+			if (err == noErr) {
+				mFileChannelLayout = layout;
+#if VERBOSE_CHANNELMAP
+				printf("existing file's channel layout: %s\n", CAChannelLayouts::ConstantToString(mFileChannelLayout.Tag()));
+#endif
+			}
+			free(layout);
+			XThrowIfError(err, "get audio file's channel layout");
+		}
+	}
+	
+	if (mFileDataFormat.mSampleRate != baseFormat.mSampleRate && mFileDataFormat.mSampleRate != 0. && baseFormat.mSampleRate != 0.)
+		mActualToBaseSampleRateRatio = mFileDataFormat.mSampleRate / baseFormat.mSampleRate;
+	else
+		mActualToBaseSampleRateRatio = 1.0;
+	
 	if (mMode != kReading)
 		return;
 	
@@ -475,7 +529,7 @@ void	CAAudioFile::GetExistingFileInfo()
 	mPacketMark = 0;
 	mFrameMark = 0;
 	
-	UpdateClientMaxPacketSize();
+	UpdateInternals();
 }
 
 // =======================================================================================
@@ -498,6 +552,9 @@ void	CAAudioFile::SetFileChannelLayout(const CAAudioChannelLayout &layout)
 void	CAAudioFile::SetClientFormat(const CAStreamBasicDescription &dataFormat, const CAAudioChannelLayout *layout)
 {
 	LOG_FUNCTION("CAAudioFile::SetClientFormat", "%p", this);
+#if LOG_FUNCTION_ENTRIES
+	dataFormat.PrintFormat(stdout, "", "  Client format: ");
+#endif
 	XThrowIf(!dataFormat.IsPCM(), kExtAudioFileError_NonPCMClientFormat, "non-PCM client format on audio file");
 	
 	bool dataFormatChanging = (mClientDataFormat.mFormatID == 0 || mClientDataFormat != dataFormat);
@@ -543,8 +600,6 @@ void	CAAudioFile::SetClientFormat(const CAStreamBasicDescription &dataFormat, co
 		// We need an AudioConverter.
 		if (mMode == kReading) {
 			// file -> client (decode)
-//mFileDataFormat.PrintFormat(  stdout, "", "File:   ");
-//mClientDataFormat.PrintFormat(stdout, "", "Client: ");
 
 			if (mConverter == NULL)
 				XThrowIfError(AudioConverterNew(&mFileDataFormat, &mClientDataFormat, &mConverter),
@@ -552,6 +607,8 @@ void	CAAudioFile::SetClientFormat(const CAStreamBasicDescription &dataFormat, co
 			
 #if VERBOSE_CONVERTER
 			printf("CAAudioFile %p -- created converter\n", this);
+			mFileDataFormat.PrintFormat(  stdout, "", "  File:   ");
+			mClientDataFormat.PrintFormat(stdout, "", "  Client: ");
 			CAShow(mConverter);
 #endif
 			// set the magic cookie, if any (for decode)
@@ -559,7 +616,10 @@ void	CAAudioFile::SetClientFormat(const CAStreamBasicDescription &dataFormat, co
 				SetConverterProperty(kAudioConverterDecompressionMagicCookie, mMagicCookieSize, mMagicCookie, mFileDataFormat.IsPCM());
 					// we get cookies from some AIFF's but the converter barfs on them,
 					// so we set canFail to true for PCM
-
+#if VERBOSE_CONVERTER
+			printf("After setting cookie:\n");
+			CAShow(mConverter);
+#endif
 			SetConverterChannelLayout(false, mFileChannelLayout);
 			SetConverterChannelLayout(true, mClientChannelLayout);
 			
@@ -572,8 +632,11 @@ void	CAAudioFile::SetClientFormat(const CAStreamBasicDescription &dataFormat, co
 				err = AudioFileGetProperty(mAudioFile, kAudioFilePropertyPacketTableInfo, &propertySize, &pti);
 				if (err == noErr && (pti.mPrimingFrames > 0 || pti.mRemainderFrames > 0)) {
 					AudioConverterPrimeInfo primeInfo;
-					primeInfo.leadingFrames = pti.mPrimingFrames;
-					primeInfo.trailingFrames = pti.mRemainderFrames;
+					primeInfo.leadingFrames = (SInt32)(pti.mPrimingFrames * mActualToBaseSampleRateRatio + 0.5);
+					primeInfo.trailingFrames = 0; //pti.mRemainderFrames;
+#if VERBOSE_CONVERTER
+					printf("Setting prime info (%d leading, scaled from %d) on converter from file\n", (int)primeInfo.leadingFrames, (int)pti.mPrimingFrames);
+#endif
 					/* ignore any error. better to play it at all than not. */
 					/*err = */AudioConverterSetProperty(mConverter, kAudioConverterPrimeInfo, sizeof(primeInfo), &primeInfo);
 					//XThrowIfError(err, "couldn't set prime info on converter");
@@ -583,6 +646,12 @@ void	CAAudioFile::SetClientFormat(const CAStreamBasicDescription &dataFormat, co
 			// client -> file (encode)
 			if (mConverter == NULL)
 				XThrowIfError(AudioConverterNew(&mClientDataFormat, &mFileDataFormat, &mConverter), "create audio converter");
+#if VERBOSE_CONVERTER
+			printf("ExtAudioFile %p -- created converter with formats:\n", this);
+			mClientDataFormat.PrintFormat(stdout, "", "  Client: ");
+			mFileDataFormat.PrintFormat(  stdout, "", "  File:   ");
+			CAShow(mConverter);
+#endif
 			mWriteBufferList = CABufferList::New("", mClientDataFormat);
 			SetConverterChannelLayout(false, mClientChannelLayout);
 			SetConverterChannelLayout(true, mFileChannelLayout);
@@ -591,7 +660,7 @@ void	CAAudioFile::SetClientFormat(const CAStreamBasicDescription &dataFormat, co
 		} else
 			XThrowIfError(kExtAudioFileError_InvalidOperationOrder, "audio file format not yet known");
 	}
-	UpdateClientMaxPacketSize();
+	UpdateInternals();
 }
 
 // _______________________________________________________________________________________
@@ -612,7 +681,7 @@ OSStatus	CAAudioFile::SetConverterProperty(
 			XThrowIfError(err, "set audio converter property");
 		}
 	}
-	UpdateClientMaxPacketSize();
+	UpdateInternals();
 	if (mMode == kPreparingToWrite)
 		FileFormatChanged();
 	return err;
@@ -655,8 +724,9 @@ CFArrayRef  CAAudioFile::GetConverterConfig()
 }
 
 // _______________________________________________________________________________________
-//
-void	CAAudioFile::UpdateClientMaxPacketSize()
+// called from FileFormatChanged, GetExistingFileInfo, SetConverterProperty
+// also maintains mFrame0Offset
+void	CAAudioFile::UpdateInternals()
 {
 	LOG_FUNCTION("CAAudioFile::UpdateClientMaxPacketSize", "%p", this);
 	mFrame0Offset = 0;
@@ -675,8 +745,25 @@ void	CAAudioFile::UpdateClientMaxPacketSize()
 			OSStatus err = AudioConverterGetProperty(mConverter, kAudioConverterPrimeInfo, &propertySize, &primeInfo);
 			if (err == noErr)
 				mFrame0Offset = primeInfo.leadingFrames;
-#if VERBOSE_CONVERTER
-			printf("kAudioConverterPrimeInfo: err = %ld, leadingFrames = %ld\n", err, mFrame0Offset);
+					//(SInt32)(mActualToBaseSampleRateRatio * primeInfo.leadingFrames + 0.5);
+
+			AudioFilePacketTableInfo pti;
+			UInt32 propertySize = sizeof(pti);
+			err = AudioFileGetProperty(mAudioFile, kAudioFilePropertyPacketTableInfo, &propertySize, &pti);
+			if (err == noErr) {
+				double srcRatio;
+				if (mClientDataFormat.mSampleRate != 0 && mFileDataFormat.mSampleRate != 0) {
+					srcRatio = mClientDataFormat.mSampleRate / mFileDataFormat.mSampleRate;
+					//printf("client/file sample rates %.f / %.f = %.2f\n", mClientDataFormat.mSampleRate, mFileDataFormat.mSampleRate, srcRatio);
+				} else
+					srcRatio = 1.0;
+				
+				mDecodeValidFrames = (SInt32)(mActualToBaseSampleRateRatio * srcRatio * pti.mNumberValidFrames + 0.5);
+				//printf("mDecodeValidFrames: %qd\n", mDecodeValidFrames);
+			}
+
+#if VERBOSE_CONVERTER || LOG_TRIMMING
+			printf("kAudioConverterPrimeInfo: err = %ld, leadingFrames (scaled) = %ld\n", err, mFrame0Offset);
 #endif
 		}
 	} else {
@@ -710,17 +797,14 @@ void	CAAudioFile::AllocateBuffers(bool okToFail)
 		mIOBufferSizePackets = bufferSizeBytes / mFileMaxPacketSize;
 	}
 	
-	UInt32 propertySize = sizeof(UInt32);
-	UInt32 externallyFramed;
-	XThrowIfError(AudioFormatGetProperty(kAudioFormatProperty_FormatIsExternallyFramed,
-			sizeof(AudioStreamBasicDescription), &mFileDataFormat, &propertySize, &externallyFramed),
-			"is format externally framed");
-	if (mNumPacketDescs != (externallyFramed ? mIOBufferSizePackets : 0)) {
+		// have to determine this based on the format reported by the file
+	bool isVBR = mFileDataFormat.mBytesPerPacket == 0 || mFileDataFormat.mFramesPerPacket == 0;
+	if (mNumPacketDescs != (isVBR ? mIOBufferSizePackets : 0)) {
 		delete[] mPacketDescs;
 		mPacketDescs = NULL;
 		mNumPacketDescs = 0;
 
-		if (externallyFramed) {
+		if (isVBR) {
 			//printf("reallocating packet descs\n");
 			mPacketDescs = new AudioStreamPacketDescription[mIOBufferSizePackets];
 			mNumPacketDescs = mIOBufferSizePackets;
@@ -924,8 +1008,8 @@ void	CAAudioFile::Read(UInt32 &ioNumPackets, AudioBufferList *ioData)
 				return;
 			}
 			mFrameMark += skipFrames;
-#if VERBOSE_IO
-			printf("CAAudioFile::ReadPackets: skipped %ld frames\n", skipFrames);
+#if VERBOSE_IO || LOG_TRIMMING
+			printf("ExtAudioFile::ReadPackets: skipped %ld frames\n", skipFrames);
 #endif
 
 			mFramesToSkipFollowingSeek -= skipFrames;
@@ -952,9 +1036,29 @@ void	CAAudioFile::Read(UInt32 &ioNumPackets, AudioBufferList *ioData)
 		mInConverter = false;
 #endif
 	}
-	if (mClientDataFormat.mFramesPerPacket == 1)
-		mFrameMark += nPackets;
-	
+	if (mClientDataFormat.mFramesPerPacket == 1) {
+#if LOG_TRIMMING
+		SInt64 frame0 = mFrameMark;
+#endif	
+		SInt64 frame1 = mFrameMark + nPackets;
+		
+		if (mDecodeValidFrames != 0 && frame1 > mDecodeValidFrames) {
+			// must trim
+			SInt64 framesToTrim = frame1 - mDecodeValidFrames;
+			if (framesToTrim > nPackets)
+				framesToTrim = nPackets;
+			int bytesToTrim = framesToTrim * mClientDataFormat.mBytesPerFrame;
+			
+			for (int i = ioData->mNumberBuffers; --i >= 0 ; )
+				ioData->mBuffers[i].mDataByteSize -= bytesToTrim;
+			nPackets -= framesToTrim;
+#if LOG_TRIMMING
+			printf("frames [%qd, %qd), trimmed %qd\n", frame0, frame1, framesToTrim);
+#endif
+		} else {
+			mFrameMark = frame1;
+		}
+	}
 	ioNumPackets = nPackets;
 }
 
@@ -1021,7 +1125,7 @@ OSStatus CAAudioFile::ReadInputProc(	AudioConverterRef				inAudioConverter,
 	ElapsedTime(This, read, This->mTicksInIO);
 
 	if (err) {
-		DebugMessageN1("Error %ld from AudioFileReadPackets!!!\n", err);
+		DebugMessageN1("Error %d from AudioFileReadPackets!!!\n", (int)err);
 		return err;
 	}
 	
@@ -1112,7 +1216,7 @@ void	CAAudioFile::FlushEncoder()
 			OSStatus err;
 			AudioConverterPrimeInfo primeInfo;
 			propertySize = sizeof(primeInfo);
-	
+
 			err = AudioConverterGetProperty(mConverter, kAudioConverterPrimeInfo, &propertySize, &primeInfo);
 			if (err == noErr) {
 				AudioFilePacketTableInfo pti;

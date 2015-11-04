@@ -1,44 +1,43 @@
-/*	Copyright: 	© Copyright 2005 Apple Computer, Inc. All rights reserved.
-
-	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
-			("Apple") in consideration of your agreement to the following terms, and your
-			use, installation, modification or redistribution of this Apple software
-			constitutes acceptance of these terms.  If you do not agree with these terms,
-			please do not use, install, modify or redistribute this Apple software.
-
-			In consideration of your agreement to abide by the following terms, and subject
-			to these terms, Apple grants you a personal, non-exclusive license, under Apple’s
-			copyrights in this original Apple software (the "Apple Software"), to use,
-			reproduce, modify and redistribute the Apple Software, with or without
-			modifications, in source and/or binary forms; provided that if you redistribute
-			the Apple Software in its entirety and without modifications, you must retain
-			this notice and the following text and disclaimers in all such redistributions of
-			the Apple Software.  Neither the name, trademarks, service marks or logos of
-			Apple Computer, Inc. may be used to endorse or promote products derived from the
-			Apple Software without specific prior written permission from Apple.  Except as
-			expressly stated in this notice, no other rights or licenses, express or implied,
-			are granted by Apple herein, including but not limited to any patent rights that
-			may be infringed by your derivative works or by other works in which the Apple
-			Software may be incorporated.
-
-			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE MAKES NO
-			WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION THE IMPLIED
-			WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-			PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND OPERATION ALONE OR IN
-			COMBINATION WITH YOUR PRODUCTS.
-
-			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL OR
-			CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-			GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-			ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION, MODIFICATION AND/OR DISTRIBUTION
-			OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF CONTRACT, TORT
-			(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
-			ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-/*=============================================================================
-	CAAudioFilePlayer.cpp
+/*	Copyright © 2007 Apple Inc. All Rights Reserved.
 	
-=============================================================================*/
+	Disclaimer: IMPORTANT:  This Apple software is supplied to you by 
+			Apple Inc. ("Apple") in consideration of your agreement to the
+			following terms, and your use, installation, modification or
+			redistribution of this Apple software constitutes acceptance of these
+			terms.  If you do not agree with these terms, please do not use,
+			install, modify or redistribute this Apple software.
+			
+			In consideration of your agreement to abide by the following terms, and
+			subject to these terms, Apple grants you a personal, non-exclusive
+			license, under Apple's copyrights in this original Apple software (the
+			"Apple Software"), to use, reproduce, modify and redistribute the Apple
+			Software, with or without modifications, in source and/or binary forms;
+			provided that if you redistribute the Apple Software in its entirety and
+			without modifications, you must retain this notice and the following
+			text and disclaimers in all such redistributions of the Apple Software. 
+			Neither the name, trademarks, service marks or logos of Apple Inc. 
+			may be used to endorse or promote products derived from the Apple
+			Software without specific prior written permission from Apple.  Except
+			as expressly stated in this notice, no other rights or licenses, express
+			or implied, are granted by Apple herein, including but not limited to
+			any patent rights that may be infringed by your derivative works or by
+			other works in which the Apple Software may be incorporated.
+			
+			The Apple Software is provided by Apple on an "AS IS" basis.  APPLE
+			MAKES NO WARRANTIES, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION
+			THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY AND FITNESS
+			FOR A PARTICULAR PURPOSE, REGARDING THE APPLE SOFTWARE OR ITS USE AND
+			OPERATION ALONE OR IN COMBINATION WITH YOUR PRODUCTS.
+			
+			IN NO EVENT SHALL APPLE BE LIABLE FOR ANY SPECIAL, INDIRECT, INCIDENTAL
+			OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+			SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+			INTERRUPTION) ARISING IN ANY WAY OUT OF THE USE, REPRODUCTION,
+			MODIFICATION AND/OR DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED
+			AND WHETHER UNDER THEORY OF CONTRACT, TORT (INCLUDING NEGLIGENCE),
+			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
+			POSSIBILITY OF SUCH DAMAGE.
+*/
 /*=============================================================================
 	CAAudioFilePlayer.cpp
 	
@@ -54,24 +53,14 @@ CAAudioFilePlayer::CAAudioFilePlayer(int nBuffers, UInt32 bufferSizeFrames) :
 	// open output unit
 	Component comp;
 	ComponentDescription desc;
-	
+
+	// use AUHAL
 	desc.componentType = kAudioUnitType_Output;
-	desc.componentSubType = kAudioUnitSubType_DefaultOutput;
+	desc.componentSubType = kAudioUnitSubType_HALOutput;
 	desc.componentManufacturer = kAudioUnitManufacturer_Apple;
 	desc.componentFlags = 0;
 	desc.componentFlagsMask = 0;
 	comp = FindNextComponent(NULL, &desc);
-	
-	//	if we can't find the default one, look explicitly for AUHAL
-	if(comp == NULL)
-	{
-		desc.componentType = kAudioUnitType_Output;
-		desc.componentSubType = kAudioUnitSubType_HALOutput;
-		desc.componentManufacturer = kAudioUnitManufacturer_Apple;
-		desc.componentFlags = 0;
-		desc.componentFlagsMask = 0;
-		comp = FindNextComponent(NULL, &desc);
-	}
 	
 	XThrowIf(comp == NULL, -1, "find audio output unit");
 	XThrowIfError(OpenAComponent(comp, &mOutputUnit), "open audio output unit");
@@ -89,20 +78,53 @@ CAAudioFilePlayer::CAAudioFilePlayer(int nBuffers, UInt32 bufferSizeFrames) :
 #endif
 }
 
+#if !TARGET_OS_WIN32
+CAAudioFilePlayer::CAAudioFilePlayer(int nBuffers, UInt32 bufferSizeFrames, AudioDeviceID theDevice) :
+	CAAudioFileReader(nBuffers, bufferSizeFrames),
+	mOutputUnit(NULL)
+{
+	// open output unit
+	Component comp;
+	ComponentDescription desc;
+
+	// use AUHAL if device is specified, if unknown device use the default output unit
+	desc.componentType = kAudioUnitType_Output;
+	desc.componentSubType = (theDevice == kAudioDeviceUnknown) ? kAudioUnitSubType_DefaultOutput : kAudioUnitSubType_HALOutput;
+	desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+	desc.componentFlags = 0;
+	desc.componentFlagsMask = 0;
+	comp = FindNextComponent(NULL, &desc);
+	
+	XThrowIf(comp == NULL, -1, "find audio output unit");
+	XThrowIfError(OpenAComponent(comp, &mOutputUnit), "open audio output unit");
+	XThrowIfError(AudioUnitInitialize(mOutputUnit), "initialize audio output unit");
+	
+	SetDevice(theDevice);
+}
+#endif
+
 CAAudioFilePlayer::~CAAudioFilePlayer()
 {
 	if (mOutputUnit)
 		CloseComponent(mOutputUnit);
 }
 
-void	CAAudioFilePlayer::SetFile(const FSRef &inFile)
+#if !TARGET_OS_WIN32
+void	CAAudioFilePlayer::SetDevice(AudioDeviceID theDevice)
+{
+	if (theDevice != kAudioDeviceUnknown)
+		AudioUnitSetProperty(mOutputUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &theDevice, sizeof(theDevice));
+}
+#endif
+
+void	CAAudioFilePlayer::SetFile(const FSRef &inFile, bool forceStereoOutput)
 {
 	Stop();
 	CAAudioFileReader::SetFile(inFile);
-	SetupChannelMapping();
+	SetupChannelMapping(forceStereoOutput);
 }
 
-void	CAAudioFilePlayer::SetupChannelMapping()
+void	CAAudioFilePlayer::SetupChannelMapping(bool forceStereoOutput)
 {
 	// set render callback
 	AURenderCallbackStruct input;
