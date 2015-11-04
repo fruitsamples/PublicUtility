@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAVectorUnitTypes.h
-	
-=============================================================================*/
-
 #ifndef __CAVectorUnitTypes_h__
 #define __CAVectorUnitTypes_h__
 

@@ -38,10 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAByteOrder.h
-	
-=============================================================================*/
 #if !defined(__CAByteOrder_h__)
 #define __CAByteOrder_h__
 

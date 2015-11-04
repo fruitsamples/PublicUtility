@@ -38,44 +38,29 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-#if !defined(__CABool_h__)
-#define __CABool_h__
+#if !defined(__CACFDistributedNotification_h__)
+#define __CACFDistributedNotification_h__
 
-//=============================================================================
+//==================================================================================================
 //	Includes
-//=============================================================================
+//==================================================================================================
 
 //	System Includes
-#include "CADebugMacros.h"
-#include "CAException.h"
+#include <CoreAudio/CoreAudioTypes.h>
+#include <CoreFoundation/CoreFoundation.h>
 
-//=============================================================================
-//	CABool
-//
-//  This class implements a boolean value that has a third state that marks
-//  it as uninitialized. Accessing the value of an instance of this class that
-//  is uninitialized will throw an exception.
-//=============================================================================
+//==================================================================================================
+//	CACFDistributedNotification
+//==================================================================================================
 
-class CABool
+class CACFDistributedNotification
 {
 
-//	Construction/Destruction
+//	Operations
 public:
-					CABool() : mValue(-1) {}
-					CABool(bool inValue) : mValue(inValue ? 1 : 0) {}
-					CABool(const CABool& inValue) : mValue(inValue.mValue) {}
-					~CABool() {}
-					
-	CABool&			operator=(bool inValue) { mValue = inValue; return *this; }
-	CABool&			operator=(const CABool& inValue) { mValue = inValue.mValue; return *this; }
-	
-					operator bool() const { ThrowIf(mValue == -1, CAException('nope'), "CABool: uninitialized"); return mValue != 0; }
-	bool			IsInitialized() const { return mValue != -1; }
-	void			Uninitialize() { mValue = -1; }
-
-private:
-	SInt32			mValue;
+	static void		AddObserver(const void* inObserver, CFNotificationCallback inCallback, CFStringRef inName, CFNotificationSuspensionBehavior inSuspensionBehavior = CFNotificationSuspensionBehaviorCoalesce);
+	static void		RemoveObserver(const void* inObserver, CFStringRef inName);
+	static void		PostNotification(CFStringRef inName, CFDictionaryRef inUserInfo, bool inPostToAllSessions);
 
 };
 

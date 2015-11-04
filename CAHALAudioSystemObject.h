@@ -38,44 +38,45 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-#if !defined(__CABool_h__)
-#define __CABool_h__
+#if !defined(__CAHALAudioSystemObject_h__)
+#define __CAHALAudioSystemObject_h__
 
-//=============================================================================
+//==================================================================================================
 //	Includes
-//=============================================================================
+//==================================================================================================
 
-//	System Includes
-#include "CADebugMacros.h"
-#include "CAException.h"
+//	Super Class Includes
+#include "CAHALAudioObject.h"
 
-//=============================================================================
-//	CABool
-//
-//  This class implements a boolean value that has a third state that marks
-//  it as uninitialized. Accessing the value of an instance of this class that
-//  is uninitialized will throw an exception.
-//=============================================================================
+//==================================================================================================
+//	CAHALAudioSystemObject
+//==================================================================================================
 
-class CABool
+class CAHALAudioSystemObject
+:
+	public	CAHALAudioObject
 {
 
 //	Construction/Destruction
 public:
-					CABool() : mValue(-1) {}
-					CABool(bool inValue) : mValue(inValue ? 1 : 0) {}
-					CABool(const CABool& inValue) : mValue(inValue.mValue) {}
-					~CABool() {}
-					
-	CABool&			operator=(bool inValue) { mValue = inValue; return *this; }
-	CABool&			operator=(const CABool& inValue) { mValue = inValue.mValue; return *this; }
-	
-					operator bool() const { ThrowIf(mValue == -1, CAException('nope'), "CABool: uninitialized"); return mValue != 0; }
-	bool			IsInitialized() const { return mValue != -1; }
-	void			Uninitialize() { mValue = -1; }
+					CAHALAudioSystemObject();
+	virtual			~CAHALAudioSystemObject();
 
-private:
-	SInt32			mValue;
+//	Audio Device List Management
+public:
+	UInt32			GetNumberAudioDevices() const;
+	void			GetAudioDevices(UInt32& ioNumberAudioDevices, AudioObjectID* outAudioDevices) const;
+	AudioObjectID	GetAudioDeviceAtIndex(UInt32 inIndex) const;
+	AudioObjectID	GetAudioDeviceForUID(CFStringRef inUID) const;
+
+//	Default Device Management
+public:
+	AudioObjectID	GetDefaultAudioDevice(bool inIsInput, bool inIsSystem) const;
+	void			SetDefaultAudioDevice(bool inIsInput, bool inIsSystem, AudioObjectID inNewDefaultDevice);
+	
+//	PlugIns
+public:
+	AudioObjectID	GetAudioPlugInForBundleID(CFStringRef inBundleID) const;
 
 };
 

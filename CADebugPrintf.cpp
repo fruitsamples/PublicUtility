@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*==================================================================================================
-	CADebugPrintf.c
-
-==================================================================================================*/
-
 //==================================================================================================
 //	Includes
 //==================================================================================================
@@ -78,7 +73,7 @@
 			if(sDebugPrintfSideFile == NULL)
 			{
 				char theFileName[1024];
-				sprintf(theFileName, CoreAudio_UseSideFile, getpid());
+				snprintf(theFileName, sizeof(theFileName), CoreAudio_UseSideFile, getpid());
 				sDebugPrintfSideFile = fopen(theFileName, "a+");
 				DebugPrintfRtn(DebugPrintfFileComma "\n------------------------------\n");
 			}

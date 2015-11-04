@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAAUMIDIMap.h
-	
-=============================================================================*/
-
 #ifndef __CAAUMIDIMap_h_
 #define __CAAUMIDIMap_h_
 

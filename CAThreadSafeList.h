@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAThreadSafeList.h
-	
-=============================================================================*/
-
 #ifndef __CAThreadSafeList_h__
 #define __CAThreadSafeList_h__
 
@@ -203,7 +198,7 @@ private:
 	{
 		Node *node = mFreeList.pop_atomic();
 		if (node == NULL)
-			node = (Node *)malloc(sizeof(Node));
+			node = (Node *)CA_malloc(sizeof(Node));
 		return node;
 	}
 	

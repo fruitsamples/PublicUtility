@@ -38,20 +38,10 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-//
-//  CARingBuffer.h
-//
-//  Created by Cynthia Bruyns on 3/29/06.
-//  Copyright 2006 Apple Computer. All rights reserved.
-//
-
-#include <CoreServices/CoreServices.h>
-
 #if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
 	#include <CoreAudio/CoreAudioTypes.h>
 #else
 	#include <CoreAudioTypes.h>
-	#include <DriverServices.h> // for CompareAndSwap
 #endif
 
 
@@ -101,9 +91,9 @@ public:
 	
 protected:
 
-	int						FrameOffset(SampleTime frameNumber) { return (frameNumber & mCapacityFramesMask) * mBytesPerFrame; }
+	int						FrameOffset(SampleTime frameNumber) { return (frameNumber % mCapacityFrames) * mBytesPerFrame; }
 
-	CARingBufferError	CheckTimeBounds(SampleTime startRead, SampleTime endRead, bool aheadOK);
+	CARingBufferError	CheckTimeBounds(SampleTime& startRead, SampleTime& endRead);
 	
 	// these should only be called from Store.
 	SampleTime				StartTime() const { return mTimeBoundsQueue[mTimeBoundsQueuePtr & kGeneralRingTimeBoundsQueueMask].mStartTime; }
@@ -115,7 +105,7 @@ protected:
 	int						mNumberChannels;
 	UInt32					mBytesPerFrame;			// within one deinterleaved channel
 	UInt32					mCapacityFrames;		// per channel, must be a power of 2
-	UInt32					mCapacityFramesMask;
+	//UInt32				mCapacityFramesMask;
 	UInt32					mCapacityBytes;			// per channel
 	
 	// range of valid sample time in the buffer

@@ -38,10 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	AUParamInfo.h
-	
-=============================================================================*/
 #include <map>
 #include <vector>
 #include <AudioUnit/AudioUnit.h>

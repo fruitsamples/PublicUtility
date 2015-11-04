@@ -38,19 +38,12 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	AUOutputBL.h
-	
-=============================================================================*/
-
 #ifndef __AUOutputBL_h__
 #define __AUOutputBL_h__
 
 #include "CAStreamBasicDescription.h"
 #if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
-	#include <CoreServices/CoreServices.h>
 #else
-	#include <AssertMacros.h>
 #endif
 
 // ____________________________________________________________________________

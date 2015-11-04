@@ -42,97 +42,60 @@
 //	Includes
 //==================================================================================================
 
-#include "CACFMachPort.h"
-#include "CAException.h"
+//	Self Include
+#include "CACFDistributedNotification.h"
+
+//	PublicUtility Includes
 #include "CADebugMacros.h"
 
 //==================================================================================================
-//	CACFMachPort
+//	CACFDistributedNotification
 //==================================================================================================
 
-//	This constructor is the short form. The CFMachPort will own the send and receive rights.
-CACFMachPort::CACFMachPort(CFMachPortCallBack inCallBack, void* inUserData)
-:
-	mMachPort(NULL),
-	mRunLoopSource(NULL),
-	mOwnsPort(true)
+void	CACFDistributedNotification::AddObserver(const void* inObserver, CFNotificationCallback inCallback, CFStringRef inName, CFNotificationSuspensionBehavior inSuspensionBehavior)
 {
-	CFMachPortContext theContext = { 1, inUserData, NULL, NULL, NULL };
-	mMachPort = CFMachPortCreate(NULL, inCallBack, &theContext, NULL);
-	ThrowIfNULL(mMachPort, CAException('what'), "CACFMachPort::CACFMachPort(s): couldn't create the CFMachPort");
-
-	mRunLoopSource = CFMachPortCreateRunLoopSource(NULL, mMachPort, 0);
-	if(mRunLoopSource == NULL)
-	{
-		CFMachPortInvalidate(mMachPort);
-		CFRelease(mMachPort);
-		mMachPort = NULL;
-		DebugMessage("CACFMachPort::CACFMachPort(s): couldn't create the CFRunLoopSource");
-		throw CAException('what');
-	}
+#if	!TARGET_OS_IPHONE
+	CFNotificationCenterRef theCenter = CFNotificationCenterGetDistributedCenter();
+	CFNotificationSuspensionBehavior theSuspensionBehavior = inSuspensionBehavior;
+#else
+	#pragma unused(inSuspensionBehavior)
+	CFNotificationCenterRef theCenter = CFNotificationCenterGetDarwinNotifyCenter();
+	CFNotificationSuspensionBehavior theSuspensionBehavior = 0;
+#endif
+	 
+	CFNotificationCenterAddObserver(theCenter, inObserver, inCallback, inName, NULL, theSuspensionBehavior);
 }
 
-//	This constructor is the general form:
-//	-	If inMachPort is MACH_PORT_NULL, the CFMachPort will allocate the port and own the send and
-//		receive rights. Otherwise, the caller owns the rights and is resposible for cleaning them
-//		up.
-//	-	If inCallBack is NULL, then received messages will just get swallowed by the CFMachPort.
-//		This is useful if you are only using the CFMachPort to track port death (aka invalidation).
-//	-	If inInvalidationCallBack is non-NULL, then it will be installed as the invalidation
-//		callback on the CFMachPort.
-CACFMachPort::CACFMachPort(mach_port_t inMachPort, CFMachPortCallBack inCallBack, CFMachPortInvalidationCallBack inInvalidationCallBack, void* inUserData)
-:
-	mMachPort(NULL),
-	mRunLoopSource(NULL),
-	mOwnsPort(false)
+void	CACFDistributedNotification::RemoveObserver(const void* inObserver, CFStringRef inName)
 {
-	CFMachPortContext theContext = { 1, inUserData, NULL, NULL, NULL };
-	
-	if(inMachPort == MACH_PORT_NULL)
-	{
-		mMachPort = CFMachPortCreate(NULL, inCallBack, &theContext, NULL);
-		ThrowIfNULL(mMachPort, CAException('what'), "CACFMachPort::CACFMachPort: couldn't create the CFMachPort");
-		mOwnsPort = true;
-	}
-	else
-	{
-		mMachPort = CFMachPortCreateWithPort(NULL, inMachPort, inCallBack, &theContext, NULL);
-		ThrowIfNULL(mMachPort, CAException('what'), "CACFMachPort::CACFMachPort: couldn't create the CFMachPort with a port");
-		mOwnsPort = false;
-	}
-
-	mRunLoopSource = CFMachPortCreateRunLoopSource(NULL, mMachPort, 0);
-	if(mRunLoopSource == NULL)
-	{
-		if(mOwnsPort)
-		{
-			CFMachPortInvalidate(mMachPort);
-		}
-		CFRelease(mMachPort);
-		mMachPort = NULL;
-		DebugMessage("CACFMachPort::CACFMachPort: couldn't create the CFRunLoopSource");
-		throw CAException('what');
-	}
-	
-	if(inInvalidationCallBack != NULL)
-	{
-		CFMachPortSetInvalidationCallBack(mMachPort, inInvalidationCallBack);
-	}
+#if	!TARGET_OS_IPHONE
+	CFNotificationCenterRef theCenter = CFNotificationCenterGetDistributedCenter();
+#else
+	CFNotificationCenterRef theCenter = CFNotificationCenterGetDarwinNotifyCenter();
+#endif
+	 
+	CFNotificationCenterRemoveObserver(theCenter, inObserver, inName, NULL);
 }
 
-CACFMachPort::~CACFMachPort()
+void	CACFDistributedNotification::PostNotification(CFStringRef inName, CFDictionaryRef inUserInfo, bool inPostToAllSessions)
 {
-	if(mRunLoopSource != NULL)
+#if	!TARGET_OS_IPHONE
+	CFNotificationCenterRef theCenter = CFNotificationCenterGetDistributedCenter();
+	CFDictionaryRef theUserInfo = inUserInfo;
+	CFOptionFlags theFlags = kCFNotificationDeliverImmediately;
+	if(inPostToAllSessions)
 	{
-		CFRelease(mRunLoopSource);
+		theFlags += kCFNotificationPostToAllSessions;
 	}
+#else
+	//	flag unsupported features
+	Assert(inUserInfo == NULL, "CACFDistributedNotification::PostNotification: distributed notifications do not support a payload");
+	Assert(inPostToAllSessions, "CACFDistributedNotification::PostNotification: distributed notifications do not support per-session delivery");
 	
-	if(mMachPort != NULL)
-	{
-		if(mOwnsPort)
-		{
-			CFMachPortInvalidate(mMachPort);
-		}
-		CFRelease(mMachPort);
-	}
+	CFNotificationCenterRef theCenter = CFNotificationCenterGetDarwinNotifyCenter();
+	CFDictionaryRef theUserInfo = NULL;
+	CFOptionFlags theFlags = 0;
+#endif
+	 
+	 CFNotificationCenterPostNotificationWithOptions(theCenter, inName, NULL, theUserInfo, theFlags);
 }

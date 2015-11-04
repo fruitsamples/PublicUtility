@@ -38,10 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*==================================================================================================
-	CACFPlugIn.h
-
-==================================================================================================*/
 #if !defined(__CACFPlugIn_h__)
 #define __CACFPlugIn_h__
 

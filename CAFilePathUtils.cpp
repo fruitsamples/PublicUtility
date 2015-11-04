@@ -38,13 +38,15 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAFilePathUtils.cpp
-	
-=============================================================================*/
-
 #include "CAFilePathUtils.h"
 #include <string.h>
+
+#if !CA_NO_CORE_SERVICES
+#if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
+	#include <CoreServices/CoreServices.h> // FSRef
+#else
+	#include <CoreServices.h>
+#endif
 
 OSStatus	PosixPathToParentFSRefAndName(const char *path, FSRef &outParentDir, CFStringRef &outFileName)
 {
@@ -74,6 +76,7 @@ OSStatus	PosixPathToParentFSRefAndName(const char *path, FSRef &outParentDir, CF
 	
 	return err;
 }
+#endif // !CA_NO_CORE_SERVICES
 
 
 #if TARGET_OS_WIN32

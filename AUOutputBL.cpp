@@ -38,10 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	AUOutputBL.h
-	
-=============================================================================*/
 #include "AUOutputBL.h"
 #if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
 	#include <AudioUnit/AUComponent.h>
@@ -80,7 +76,7 @@ AUOutputBL::~AUOutputBL()
 		delete[] mBufferMemory;
 
 	if (mBufferList)
-		delete [] mBufferList;
+		delete [] (Byte *)mBufferList;
 }
 
 void 	AUOutputBL::Prepare (UInt32 inNumFrames, bool inWantNullBufferIfAllocated) 

@@ -38,44 +38,50 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-#if !defined(__CABool_h__)
-#define __CABool_h__
+#if !defined(__CAHALAudioStream_h__)
+#define __CAHALAudioStream_h__
 
-//=============================================================================
+//==================================================================================================
 //	Includes
-//=============================================================================
+//==================================================================================================
 
-//	System Includes
-#include "CADebugMacros.h"
-#include "CAException.h"
+//	Super Class Includes
+#include "CAHALAudioObject.h"
 
-//=============================================================================
-//	CABool
-//
-//  This class implements a boolean value that has a third state that marks
-//  it as uninitialized. Accessing the value of an instance of this class that
-//  is uninitialized will throw an exception.
-//=============================================================================
+//==================================================================================================
+//	CAHALAudioStream
+//==================================================================================================
 
-class CABool
+class CAHALAudioStream
+:
+	public	CAHALAudioObject
 {
 
 //	Construction/Destruction
 public:
-					CABool() : mValue(-1) {}
-					CABool(bool inValue) : mValue(inValue ? 1 : 0) {}
-					CABool(const CABool& inValue) : mValue(inValue.mValue) {}
-					~CABool() {}
-					
-	CABool&			operator=(bool inValue) { mValue = inValue; return *this; }
-	CABool&			operator=(const CABool& inValue) { mValue = inValue.mValue; return *this; }
-	
-					operator bool() const { ThrowIf(mValue == -1, CAException('nope'), "CABool: uninitialized"); return mValue != 0; }
-	bool			IsInitialized() const { return mValue != -1; }
-	void			Uninitialize() { mValue = -1; }
+					CAHALAudioStream(AudioObjectID inAudioStream);
+	virtual			~CAHALAudioStream();
 
-private:
-	SInt32			mValue;
+//	Attributes
+public:
+	UInt32			GetDirection() const;
+	UInt32			GetTerminalType() const;
+	UInt32			GetStartingChannel() const;
+	UInt32			GetLatency() const;
+
+//	Format Info
+public:
+	void			GetCurrentVirtualFormat(AudioStreamBasicDescription& outFormat) const;
+	void			SetCurrentVirtualFormat(const AudioStreamBasicDescription& inFormat);
+	UInt32			GetNumberAvailableVirtualFormats() const;
+	void			GetAvailableVirtualFormats(UInt32& ioNumberFormats, AudioStreamRangedDescription* outFormats) const;
+	void			GetAvailableVirtualFormatByIndex(UInt32 inIndex, AudioStreamRangedDescription& outFormat) const;
+
+	void			GetCurrentPhysicalFormat(AudioStreamBasicDescription& outFormat) const;
+	void			SetCurrentPhysicalFormat(const AudioStreamBasicDescription& inFormat);
+	UInt32			GetNumberAvailablePhysicalFormats() const;
+	void			GetAvailablePhysicalFormats(UInt32& ioNumberFormats, AudioStreamRangedDescription* outFormats) const;
+	void			GetAvailablePhysicalFormatByIndex(UInt32 inIndex, AudioStreamRangedDescription& outFormat) const;
 
 };
 

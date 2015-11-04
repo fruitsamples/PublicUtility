@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*==================================================================================================
-	CACFPreferences.cpp
-
-==================================================================================================*/
-
 //==================================================================================================
 //	Includes
 //==================================================================================================
@@ -51,6 +46,7 @@
 #include "CACFPreferences.h"
 
 //	PublicUtility Includes
+#include "CACFDistributedNotification.h"
 #include "CADebugMacros.h"
 
 //==================================================================================================
@@ -252,7 +248,7 @@ void	CACFPreferences::MarkPrefsClean(bool inCurrentUser, bool inCurrentHost)
 
 void	CACFPreferences::SendNotification(CFStringRef inName)
 {
-	CFNotificationCenterPostNotificationWithOptions(CFNotificationCenterGetDistributedCenter(), inName, NULL, NULL, kCFNotificationDeliverImmediately + kCFNotificationPostToAllSessions);
+	CACFDistributedNotification::PostNotification(inName, NULL, true);
 }
 
 bool	CACFPreferences::ArePrefsOutOfDate(bool inCurrentUser, bool inCurrentHost)

@@ -38,16 +38,16 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	BitOperations.h
-	A collection of useful operations on bits in a word.
-	created by James McCartney, March 20 2003
-	
-=============================================================================*/
+#ifndef _CABitOperations_h_
+#define _CABitOperations_h_
 
-#ifndef _BitOperations_h_
-#define _BitOperations_h_
-
+#if !defined(__COREAUDIO_USE_FLAT_INCLUDES__)
+    //#include <CoreServices/../Frameworks/CarbonCore.framework/Headers/MacTypes.h>
+	#include <CoreFoundation/CFBase.h>
+#else
+//	#include <MacTypes.h>
+	#include "CFBase.h"
+#endif
 #include <TargetConditionals.h>
 
 // return whether a number is a power of two
@@ -78,9 +78,10 @@ static int CountLeadingZeroes( int arg )
 #else 
 
 static __inline__ int CountLeadingZeroes(int arg) {
-#if defined(__ppc__)
+#if TARGET_CPU_PPC || TARGET_CPU_PPC64
 	__asm__ volatile("cntlzw %0, %1" : "=r" (arg) : "r" (arg));
-#elif defined(__i386__)
+	return arg;
+#elif TARGET_CPU_X86 || TARGET_CPU_X86_64
 	__asm__ volatile(
 				"bsrl %0, %0\n\t"
 				"movl $63, %%ecx\n\t"
@@ -89,8 +90,11 @@ static __inline__ int CountLeadingZeroes(int arg) {
 				: "=r" (arg) 
 				: "0" (arg) : "%ecx"
 			);
+	return arg;
+#else
+	if (arg == 0) return 32;
+	return __builtin_clz(arg);
 #endif
-         return arg;
 }
 
 #endif
@@ -173,6 +177,15 @@ inline UInt32 MSBitPos(UInt32 x)
 inline UInt32 MSBit(UInt32 x)
 {
 	return 1UL << MSBitPos(x);
+}
+
+// Division optimized for power of 2 denominators
+inline UInt32 DivInt(UInt32 numerator, UInt32 denominator)
+{
+	if(IsPowerOfTwo(denominator))
+		return numerator >> (31 - CountLeadingZeroes(denominator));
+	else
+		return numerator/denominator;
 }
 
 #endif

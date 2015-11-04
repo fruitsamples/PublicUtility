@@ -38,16 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*
- *  CASpectralProcessor.h
- *  
- *  A class that processes incoming audio by first transforming into the frequency domain,
- *  processing, then transforming back to the temporal domain. Created by James Mc Cartney.
- * 
- *  Created by Cynthia Bruyns on 2/17/06.
- *  Copyright 2006 Apple Computer. All rights reserved.
- *
- */
  
 //#include "AudioFormulas.h"
 #include "CASpectralProcessor.h"
@@ -114,7 +104,7 @@ void CASpectralProcessor::Reset()
 	}
 }
 
-const double two_pi = 2. * 3.14159265358979323846264338327950;
+const double two_pi = 2. * M_PI;
 
 void CASpectralProcessor::HanningWindow()
 { 
@@ -129,7 +119,7 @@ void CASpectralProcessor::HanningWindow()
 
 void CASpectralProcessor::SineWindow()
 {
-	double w = pi / (double)(mFFTSize - 1);
+	double w = M_PI / (double)(mFFTSize - 1);
 	for (UInt32 i = 0; i < mFFTSize; ++i)
 	{
 		mWindow[i] = sin(w * (double)i);
@@ -190,7 +180,7 @@ void CASpectralProcessor::CopyInput(UInt32 inNumFrames, AudioBufferList* inInput
 		}
 	}
 	//printf("CopyInput %g %g\n", mChannels[0].mInputBuf[mInputPos], mChannels[0].mInputBuf[(mInputPos + 200) & mIOMask]);
-	//printf("CopyInput mInputPos %lu   mIOBufSize %lu\n", mInputPos, mIOBufSize);
+	//printf("CopyInput mInputPos %u   mIOBufSize %u\n", (unsigned)mInputPos, (unsigned)mIOBufSize);
 	mInputSize += inNumFrames;
 	mInputPos = (mInputPos + inNumFrames) & mIOMask;
 }
@@ -198,7 +188,7 @@ void CASpectralProcessor::CopyInput(UInt32 inNumFrames, AudioBufferList* inInput
 void CASpectralProcessor::CopyOutput(UInt32 inNumFrames, AudioBufferList* outOutput)
 {
 	//printf("->CopyOutput %g %g\n", mChannels[0].mOutputBuf[mOutputPos], mChannels[0].mOutputBuf[(mOutputPos + 200) & mIOMask]);
-	//printf("CopyOutput mOutputPos %lu\n", mOutputPos);
+	//printf("CopyOutput mOutputPos %u\n", (unsigned)mOutputPos);
 	UInt32 numBytes = inNumFrames * sizeof(Float32);
 	UInt32 firstPart = mIOBufSize - mOutputPos;
 	if (firstPart < inNumFrames) {
@@ -222,12 +212,12 @@ void CASpectralProcessor::CopyOutput(UInt32 inNumFrames, AudioBufferList* outOut
 
 void CASpectralProcessor::PrintSpectralBufferList()
 {
-	//UInt32 half = mFFTSize >> 1;
+	UInt32 half = mFFTSize >> 1;
 	for (UInt32 i=0; i<mNumChannels; ++i) {
 		DSPSplitComplex	&freqData = mSpectralBufferList->mDSPSplitComplex[i];
 	
-		for (UInt32 j=0; j<mFFTSize; j++){
-			printf(" bin[%ld]: %lf + %lfi\n", j, freqData.realp[j], freqData.imagp[j]);
+		for (UInt32 j=0; j<half; j++){
+			printf(" bin[%d]: %lf + %lfi\n", (int) j, freqData.realp[j], freqData.imagp[j]);
 		}
 	}
 }
@@ -235,7 +225,7 @@ void CASpectralProcessor::PrintSpectralBufferList()
 
 void CASpectralProcessor::CopyInputToFFT()
 {
-	//printf("CopyInputToFFT mInFFTPos %lu\n", mInFFTPos);
+	//printf("CopyInputToFFT mInFFTPos %u\n", (unsigned)mInFFTPos);
 	UInt32 firstPart = mIOBufSize - mInFFTPos;
 	UInt32 firstPartBytes = firstPart * sizeof(Float32);
 	if (firstPartBytes < mFFTByteSize) {
@@ -256,7 +246,7 @@ void CASpectralProcessor::CopyInputToFFT()
 
 void CASpectralProcessor::OverlapAddOutput()
 {
-	//printf("OverlapAddOutput mOutFFTPos %lu\n", mOutFFTPos);
+	//printf("OverlapAddOutput mOutFFTPos %u\n", (unsigned)mOutFFTPos);
 	UInt32 firstPart = mIOBufSize - mOutFFTPos;
 	if (firstPart < mFFTSize) {
 		UInt32 secondPart = mFFTSize - firstPart;
@@ -317,7 +307,7 @@ void CASpectralProcessor::ProcessSpectrum(UInt32 inFFTSize, SpectralBufferList* 
 
 #pragma mark ___Utility___
 
-void CASpectralProcessor::GetMagnitude(AudioBufferList* list, Float32 &min, Float32& max) //can add flag for half or not
+void CASpectralProcessor::GetMagnitude(AudioBufferList* list, Float32* min, Float32* max) 
 {	
 	UInt32 half = mFFTSize >> 1;	
 	for (UInt32 i=0; i<mNumChannels; ++i) {
@@ -327,8 +317,8 @@ void CASpectralProcessor::GetMagnitude(AudioBufferList* list, Float32 &min, Floa
 		
 		vDSP_zvabs(&freqData,1,b,1,half); 		
    
-		vDSP_maxmgv(b, 1, &max, half); 
- 		vDSP_minmgv(b, 1, &min, half); 
+		vDSP_maxmgv(b, 1, &max[i], half); 
+ 		vDSP_minmgv(b, 1, &min[i], half); 
 		
    } 
 }
@@ -336,11 +326,10 @@ void CASpectralProcessor::GetMagnitude(AudioBufferList* list, Float32 &min, Floa
 
 void CASpectralProcessor::GetFrequencies(Float32* freqs, Float32 sampleRate)
 {
-	UInt32 half = mFFTSize >> 1;
-	
+	UInt32 half = mFFTSize >> 1;	
 
 	for (UInt32 i=0; i< half; i++){
-		freqs[i] = ((Float32)(i)/(Float32)half)*sampleRate;	
+		freqs[i] = ((Float32)(i))*sampleRate/((Float32)mFFTSize);	
 	}
 }
 
@@ -357,7 +346,7 @@ bool CASpectralProcessor::ProcessForwards(UInt32 inNumFrames, AudioBufferList* i
 		CopyInputToFFT(); // copy from input buffer to fft buffer
 		DoWindowing();
 		DoFwdFFT();
-		ProcessSpectrum(mFFTSize, mSpectralBufferList());
+		ProcessSpectrum(mFFTSize, mSpectralBufferList()); // here you would copy the fft results out to a buffer indicated in mUserData, say for sonogram drawing
 		processed = true;
 	}
 	

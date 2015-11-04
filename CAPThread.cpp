@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAPThread.cp
-
-=============================================================================*/
-
 //=============================================================================
 //	Includes
 //=============================================================================
@@ -70,6 +65,8 @@
 #define CAPTHREAD_SET_PRIORITY				0
 // returns the thread's priority as it was last scheduled by the Kernel
 #define CAPTHREAD_SCHEDULED_PRIORITY		1
+
+//#define	Log_SetPriority						1
 
 CAPThread::CAPThread(ThreadRoutine inThreadRoutine, void* inParameter, UInt32 inPriority, bool inFixedPriority, bool inAutoDelete)
 :
@@ -141,19 +138,25 @@ void	CAPThread::SetPriority(UInt32 inPriority, bool inFixedPriority)
 #if TARGET_OS_MAC
 	if(mPThread != 0)
 	{
+		kern_return_t theError = 0;
 		
+		//	set whether or not this is a fixed priority thread
 		if (mFixedPriority)
 		{
-			thread_extended_policy_data_t		theFixedPolicy;
-			theFixedPolicy.timeshare = false;	// set to true for a non-fixed thread
-			AssertNoError(thread_policy_set(pthread_mach_thread_np(mPThread), THREAD_EXTENDED_POLICY, (thread_policy_t)&theFixedPolicy, THREAD_EXTENDED_POLICY_COUNT), "CAPThread::SetPriority: failed to set the fixed-priority policy");
+			thread_extended_policy_data_t theFixedPolicy = { false };
+			theError = thread_policy_set(pthread_mach_thread_np(mPThread), THREAD_EXTENDED_POLICY, (thread_policy_t)&theFixedPolicy, THREAD_EXTENDED_POLICY_COUNT);
+			AssertNoKernelError(theError, "CAPThread::SetPriority: failed to set the fixed-priority policy");
 		}
-        // We keep a reference to the spawning thread's priority around (initialized in the constructor), 
-        // and set the importance of the child thread relative to the spawning thread's priority.
-        thread_precedence_policy_data_t		thePrecedencePolicy;
-        
-        thePrecedencePolicy.importance = mPriority - mSpawningThreadPriority;
-        AssertNoError(thread_policy_set(pthread_mach_thread_np(mPThread), THREAD_PRECEDENCE_POLICY, (thread_policy_t)&thePrecedencePolicy, THREAD_PRECEDENCE_POLICY_COUNT), "CAPThread::SetPriority: failed to set the precedence policy");
+		
+		//	set the thread's absolute priority which is relative to the priority on which thread_policy_set() is called
+		UInt32 theCurrentThreadPriority = getScheduledPriority(pthread_self(), CAPTHREAD_SET_PRIORITY);
+        thread_precedence_policy_data_t thePrecedencePolicy = { mPriority - theCurrentThreadPriority };
+		theError = thread_policy_set(pthread_mach_thread_np(mPThread), THREAD_PRECEDENCE_POLICY, (thread_policy_t)&thePrecedencePolicy, THREAD_PRECEDENCE_POLICY_COUNT);
+        AssertNoKernelError(theError, "CAPThread::SetPriority: failed to set the precedence policy");
+		
+		#if	Log_SetPriority
+			DebugMessageN4("CAPThread::SetPriority: requsted: %lu spawning: %lu current: %lu assigned: %d", mPriority, mSpawningThreadPriority, theCurrentThreadPriority, thePrecedencePolicy.importance);
+		#endif
     } 
 #elif TARGET_OS_WIN32
 	if(mThreadHandle != NULL)
@@ -338,11 +341,35 @@ UInt32 WINAPI	CAPThread::Entry(CAPThread* inCAPThread)
 	return theAnswer;
 }
 
-//	a definition of this function here for now
 extern "C"
 Boolean CompareAndSwap(UInt32 inOldValue, UInt32 inNewValue, UInt32* inOldValuePtr)
 {
 	return InterlockedCompareExchange((volatile LONG*)inOldValuePtr, inNewValue, inOldValue) == inOldValue;
 }
 
+#endif
+
+#if CoreAudio_Debug
+void	CAPThread::DebugPriority(const char *label)
+{
+#if !TARGET_OS_WIN32
+	if (mTimeConstraintSet)
+		printf("CAPThread::%s %p: pri=<time constraint>, spawning pri=%d, scheduled pri=%d\n", label, this, 
+		(int)mSpawningThreadPriority, (mPThread != NULL) ? (int)GetScheduledPriority() : -1);
+	else
+		printf("CAPThread::%s %p: pri=%d%s, spawning pri=%d, scheduled pri=%d\n", label, this, (int)mPriority, mFixedPriority ? " fixed" : "", 
+		(int)mSpawningThreadPriority, (mPThread != NULL) ? (int)GetScheduledPriority() : -1);
+#else
+	if (mTimeConstraintSet)
+	{
+		printf("CAPThread::%s %p: pri=<time constraint>, spawning pri=%d, scheduled pri=%d\n", label, this, 
+		(int)mPriority, (mThreadHandle != NULL) ? (int)GetScheduledPriority() : -1);
+	}
+	else
+	{
+		printf("CAPThread::%s %p: pri=%d%s, spawning pri=%d, scheduled pri=%d\n", label, this, (int)mPriority, mFixedPriority ? " fixed" : "", 
+		(int)mPriority, (mThreadHandle != NULL) ? (int)GetScheduledPriority() : -1);
+	}
+#endif
+}
 #endif

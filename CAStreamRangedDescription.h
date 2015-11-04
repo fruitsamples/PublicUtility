@@ -38,10 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*==================================================================================================
-	CAStreamRangedDescription.h
-
-==================================================================================================*/
 #if !defined(__CAStreamRangedDescription_h__)
 #define __CAStreamRangedDescription_h__
 

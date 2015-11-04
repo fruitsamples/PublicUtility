@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CACFString.cp
-
-=============================================================================*/
-
 //=============================================================================
 //	Includes
 //=============================================================================
@@ -55,15 +50,15 @@
 
 UInt32	CACFString::GetStringByteLength(CFStringRef inCFString, CFStringEncoding inEncoding)
 {
-	UInt32 theAnswer = 0;
+	CFIndex theAnswer = 0;
 	
 	if(inCFString != NULL)
 	{
 		CFRange theRange = { 0, CFStringGetLength(inCFString) };
-		CFStringGetBytes(inCFString, theRange, inEncoding, 0, false, NULL, 0x7FFFFFFF, (CFIndex*)&theAnswer);
+		CFStringGetBytes(inCFString, theRange, inEncoding, 0, false, NULL, 0x7FFFFFFF, &theAnswer);
 	}
 	
-	return theAnswer;
+	return UInt32(theAnswer);
 }
 
 void	CACFString::GetCString(CFStringRef inCFString, char* outString, UInt32& ioStringSize, CFStringEncoding inEncoding)
@@ -76,7 +71,7 @@ void	CACFString::GetCString(CFStringRef inCFString, char* outString, UInt32& ioS
 			CFRange theRange = { 0, CFStringGetLength(inCFString) };
 			CFStringGetBytes(inCFString, theRange, inEncoding, 0, false, (UInt8*)outString, ioStringSize - 1, &theLength);
 			outString[theLength] = 0;
-			ioStringSize = theLength + 1;
+			ioStringSize = ToUInt32(theLength) + 1;
 		}
 		else
 		{
@@ -98,7 +93,7 @@ void	CACFString::GetUnicodeString(CFStringRef inCFString, UInt16* outString, UIn
 				theStringRange.length = ioStringSize;
 			}
 			CFStringGetCharacters(inCFString, theStringRange, outString);
-			ioStringSize = theStringRange.length;
+			ioStringSize = ToUInt32(theStringRange.length);
 		}
 		else
 		{

@@ -38,15 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*
- *  CABundleLocker.cpp
- *  CAServices
- *
- *  Created by James McCartney on Tue Dec 21 2004.
- *  Copyright (c) 2004 Apple Computer. All rights reserved.
- *
- */
-
 #include "CABundleLocker.h"
 #include <pthread.h>
 

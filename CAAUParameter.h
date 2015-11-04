@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAAUParameter.h
-	
-=============================================================================*/
-
 #ifndef __CAAUParameter_h__
 #define __CAAUParameter_h__
 

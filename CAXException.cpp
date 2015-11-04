@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAXException.cpp
-	
-=============================================================================*/
-
 #include "CAXException.h"
 
 CAXException::WarningHandler CAXException::sWarningHandler = NULL;

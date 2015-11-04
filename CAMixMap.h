@@ -38,10 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	
-=============================================================================*/
-
 #ifndef __CAMixMap_h__
 #define __CAMixMap_h__
 

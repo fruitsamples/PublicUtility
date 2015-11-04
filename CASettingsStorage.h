@@ -38,10 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*==================================================================================================
-	CASettingsStorage.h
-
-==================================================================================================*/
 #if !defined(__CASettingsStorage_h__)
 #define __CASettingsStorage_h__
 
@@ -55,6 +51,7 @@
 
 //	Stamdard Library Includes
 #include <stdio.h>
+#include <sys/stat.h>
 
 //==================================================================================================
 //	CASettingsStorage
@@ -65,7 +62,7 @@ class CASettingsStorage
 
 //	Construction/Destruction
 public:
-							CASettingsStorage(const char* inSettingsFilePath);
+							CASettingsStorage(const char* inSettingsFilePath, mode_t inSettingsFileAccessMode = 0);
 							~CASettingsStorage();
 
 //	Operations
@@ -101,6 +98,7 @@ public:
 	void					RemoveAllValues();
 	
 	void					SendNotification(const CFStringRef inName, CFDictionaryRef inData = NULL, bool inPostToAllSessions = true) const;
+	void					ForceRefresh();
 
 //	Implementation
 private:
@@ -108,8 +106,10 @@ private:
 	void					SaveSettings();
 
 	char*					mSettingsFilePath;
+	mode_t					mSettingsFileAccessMode;
 	CFMutableDictionaryRef	mSettingsCache;
 	struct timespec			mSettingsCacheTime;
+	bool					mSettingsCacheForceRefresh;
 
 };
 

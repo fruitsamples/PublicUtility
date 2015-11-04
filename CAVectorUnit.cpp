@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CAVectorUnit.cpp
-	
-=============================================================================*/
-
 #include "CAVectorUnit.h"
 
 #if !TARGET_OS_WIN32
@@ -52,13 +47,105 @@
 	#include "ippcore.h"
 #endif
 
-int CAVectorUnit::sVectorUnitType = kVecUninitialized;
+int gCAVectorUnitType = kVecUninitialized;
 
-SInt32	CAVectorUnit::CheckVectorUnit()
+#if TARGET_OS_WIN32
+// Use cpuid to check if SSE2 is available.
+// Before calling this function make sure cpuid is available
+static SInt32 IsSSE2Available()
+{
+	int return_value;
+
+	{
+		int r_edx;
+		_asm
+		{
+			mov eax, 0x01
+			cpuid
+			mov r_edx, edx
+		}
+		return_value = (r_edx >> 26) & 0x1;
+	}
+	return return_value;
+}
+
+// Use cpuid to check if SSE3 is available.
+// Before calling this function make sure cpuid is available
+static SInt32 IsSSE3Available()
+{
+	SInt32 return_value;
+
+	{
+		SInt32 r_ecx;
+		_asm
+		{
+			mov eax, 0x01
+			cpuid
+			mov r_ecx, ecx
+		}
+		return_value = r_ecx & 0x1;
+	}
+	return return_value;
+}
+
+// Return true if the cpuid instruction is available.
+// The cpuid instruction is available if bit 21 in the EFLAGS register can be changed
+// This function may not work on Intel CPUs prior to Pentium (didn't test)
+static bool IsCpuidAvailable()
+{
+	SInt32 return_value = 0x0;
+	_asm{
+		pushfd    ;			//push original EFLAGS 
+		pop eax   ;			//get original EFLAGS 
+		mov ecx, eax   ;	//save original EFLAGS 
+		xor eax, 200000h  ; //flip ID bit in EFLAGS 
+		push eax   ;		//save new EFLAGS value on stack 
+		popfd    ;			//replace current EFLAGS value 
+		pushfd    ;			//get new EFLAGS 
+		pop eax   ;			//store new EFLAGS in EAX 
+		xor eax, ecx   ;	 
+		je end_cpuid_identify  ; //can't toggle ID bit
+		mov return_value, 0x1;	
+end_cpuid_identify:
+		nop;
+		}
+		return return_value;
+}
+
+#endif
+
+SInt32	CAVectorUnit_Examine()
 {
 	int result = kVecNone;
 	
-#if !TARGET_OS_WIN32
+#if TARGET_OS_WIN32
+#if HAS_IPP	
+	// Initialize the static IPP library! This needs to be done before
+	// any IPP function calls, otherwise we may have a performance penalty
+	int status = ippStaticInit();
+	if ( status == ippStsNonIntelCpu )
+	{
+		IppCpuType cpuType = ippGetCpuType();
+		if ( cpuType >= ippCpuSSE || cpuType <= ippCpuSSE42 )
+			ippStaticInitCpu( cpuType );
+	}
+#endif
+	{
+		// On Windows we use cpuid to detect the vector unit because it works on Intel and AMD.
+		// The IPP library does not detect SSE on AMD processors.
+		if (IsCpuidAvailable())
+		{
+			if(IsSSE3Available())
+			{
+				result = kVecSSE3;
+			}
+			else if(IsSSE2Available())
+			{
+				result = kVecSSE2;
+			}
+		}
+	}
+#elif TARGET_OS_MAC
 #if DEBUG
 	if (getenv("CA_NoVector")) {
 		fprintf(stderr, "CA_NoVector set; Vector unit optimized routines will be bypassed\n");
@@ -89,27 +176,8 @@ SInt32	CAVectorUnit::CheckVectorUnit()
 		}
 	#endif
 	}
-#elif HAS_IPP
-	int error = ippStaticInit();
-	if(ippStsNoErr == error)
-	{
-		switch(ippGetCpuType())
-		{
-			case ippCpuP4HT2:
-			case ippCpuDS:
-				result = kVecSSE3;
-				break;
-			case ippCpuP4:
-			case ippCpuP4HT:
-			case ippCpuCentrino:
-				result = kVecSSE2;
-				break;
-			default:
-				break;
-		}
-	}
 #endif
-	sVectorUnitType = result;
+	gCAVectorUnitType = result;
 	return result;
 }
 

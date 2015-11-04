@@ -38,11 +38,6 @@
 			STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN ADVISED OF THE
 			POSSIBILITY OF SUCH DAMAGE.
 */
-/*=============================================================================
-	CADebugMacros.cp
-
-=============================================================================*/
-
 #include "CADebugMacros.h"
 #include <stdio.h>
 #include <stdarg.h>
